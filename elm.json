@@ -1,16 +1,17 @@
 {
     "type": "package",
-    "name": "ianmackenzie/elm-interval",
-    "summary": "Simple Interval type for Elm",
+    "name": "ianmackenzie/elm-quantity-interval",
+    "summary": "Version of elm-interval based on the Quantity type from elm-units",
     "license": "MPL-2.0",
     "version": "2.0.0",
     "exposed-modules": [
-        "Interval"
+        "Quantity.Interval"
     ],
     "elm-version": "0.19.0 <= v < 0.20.0",
     "dependencies": {
         "elm/core": "1.0.0 <= v < 2.0.0",
-        "ianmackenzie/elm-float-extra": "1.0.1 <= v < 2.0.0"
+        "ianmackenzie/elm-float-extra": "1.0.1 <= v < 2.0.0",
+        "ianmackenzie/elm-units": "1.0.0 <= v < 2.0.0"
     },
     "test-dependencies": {
         "elm-explorations/test": "1.1.0 <= v < 2.0.0"

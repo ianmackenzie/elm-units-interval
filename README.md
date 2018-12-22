@@ -1,7 +1,7 @@
-# elm-interval
+# elm-quantity-interval
 
-This package implements a simple `Interval` type for [Elm](http://elm-lang.org).
-Both `Int` and `Float` intervals are supported, for example:
+This package implements an `Interval` type similar to that from [`elm-interval`][elm-interval]
+but based on the `Quantity` type from [`elm-units`][elm-units].
 
 ```elm
 rgbRange : Interval Int
@@ -53,7 +53,5 @@ Interval.sin (Interval.from 0 pi)
 --> Interval.from 0 1
 ```
 
-Currently the only functions that have been implemented are ones that were
-needed by the `elm-geometry` package, but I'm happy to consider pull requests
-for other generally-useful functionality. Please [open a new issue](https://github.com/ianmackenzie/elm-interval/issues)
-before starting work, though, so we can discuss different approaches!
+[elm-interval]: https://package.elm-lang.org/packages/ianmackenzie/elm-interval/latest/
+[elm-units]: https://package.elm-lang.org/packages/ianmackenzie/elm-units/latest/

@@ -39,25 +39,15 @@ module Interval exposing
 -}
 
 import Float.Extra as Float
+import Quantity exposing (Quantity)
 
 
 {-| Represents a finite, closed interval with a minimum and maximum value, for
 example the interval from 3 to 5. An `Interval Int` represents a range of
 integers and an `Interval Float` represents a range of floating-point values.
 -}
-type Interval number
-    = Interval ( number, number )
-
-
-{-| The unit interval, from 0 to 1.
-
-    Interval.unit
-    --> Interval.from 0 1
-
--}
-unit : Interval number
-unit =
-    from 0 1
+type Interval number units
+    = Interval ( Quantity number units, Quantity number units )
 
 
 {-| Construct a zero-width interval containing a single value.
@@ -66,7 +56,7 @@ unit =
     --> Interval.fromEndpoints ( 3, 3 )
 
 -}
-singleton : number -> Interval number
+singleton : Quantity number units -> Interval number units
 singleton value =
     Interval ( value, value )
 
@@ -87,13 +77,13 @@ necessary to ensure a valid interval is returned:
     --> ( 2, 3 )
 
 -}
-fromEndpoints : ( number, number ) -> Interval number
+fromEndpoints : ( Quantity number units, Quantity number units ) -> Interval number units
 fromEndpoints givenEndpoints =
     let
         ( firstValue, secondValue ) =
             givenEndpoints
     in
-    if firstValue <= secondValue then
+    if firstValue |> Quantity.lessThanOrEqualTo secondValue then
         Interval givenEndpoints
 
     else
