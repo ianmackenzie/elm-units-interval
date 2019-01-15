@@ -2,43 +2,62 @@ module Tests exposing
     ( aggregate
     , containingValues
     , cosWorksProperly
-    , endpointsString
-    , expectContainedIn
-    , expectDistinct
-    , expectValueIn
-    , fuzzer
     , hull
     , intersection
     , intersectsAndIntersectionAreConsistent
     , sinWorksProperly
     )
 
+import Angle exposing (Radians)
 import Expect exposing (Expectation)
 import Fuzz exposing (Fuzzer)
-import Interval exposing (Interval)
+import Interval
+import Quantity exposing (Quantity, Unitless)
+import Quantity.Interval exposing (Interval)
 import Test exposing (Test)
 
 
-fuzzer : Fuzzer (Interval Float)
+fuzzer : Fuzzer (Interval Float Unitless)
 fuzzer =
     let
         endpoint =
-            Fuzz.floatRange -10 10
+            Fuzz.map Quantity.float (Fuzz.floatRange -10 10)
     in
-    Fuzz.map2 Interval.from endpoint endpoint
+    Fuzz.map2 Quantity.Interval.from endpoint endpoint
 
 
-endpointsString : Interval Float -> String
-endpointsString interval =
+floatEndpointsString : Interval.Interval Float -> String
+floatEndpointsString interval =
     let
         ( minValue, maxValue ) =
             Interval.endpoints interval
     in
-    "[" ++ String.fromFloat minValue ++ "," ++ String.fromFloat maxValue ++ "]"
+    String.concat
+        [ "["
+        , String.fromFloat minValue
+        , ","
+        , String.fromFloat maxValue
+        , "]"
+        ]
 
 
-expectValueIn : Interval Float -> Float -> Expectation
-expectValueIn interval value =
+endpointsString : Interval Float Unitless -> String
+endpointsString interval =
+    let
+        ( minValue, maxValue ) =
+            Quantity.Interval.endpoints interval
+    in
+    String.concat
+        [ "["
+        , String.fromFloat (Quantity.toFloat minValue)
+        , ","
+        , String.fromFloat (Quantity.toFloat maxValue)
+        , "]"
+        ]
+
+
+expectFloatIn : Interval.Interval Float -> Float -> Expectation
+expectFloatIn interval value =
     let
         ( minValue, maxValue ) =
             Interval.endpoints interval
@@ -53,53 +72,95 @@ expectValueIn interval value =
         Expect.fail
             (String.fromFloat value
                 ++ " is not contained in the interval "
+                ++ floatEndpointsString interval
+            )
+
+
+expectQuantityIn : Interval Float Unitless -> Quantity Float Unitless -> Expectation
+expectQuantityIn interval value =
+    let
+        ( minValue, maxValue ) =
+            Quantity.Interval.endpoints interval
+
+        tolerance =
+            Quantity.float 1.0e-12
+    in
+    if
+        ((minValue |> Quantity.minus tolerance)
+            |> Quantity.lessThanOrEqualTo
+                value
+        )
+            && (value
+                    |> Quantity.lessThanOrEqualTo
+                        (maxValue |> Quantity.plus tolerance)
+               )
+    then
+        Expect.pass
+
+    else
+        Expect.fail
+            (String.fromFloat (Quantity.toFloat value)
+                ++ " is not contained in the interval "
                 ++ endpointsString interval
             )
+
+
+angleFuzzer : Fuzzer (Interval Float Radians)
+angleFuzzer =
+    let
+        endpoint =
+            Fuzz.map Angle.radians (Fuzz.floatRange (-2 * pi) (2 * pi))
+    in
+    Fuzz.map2 Quantity.Interval.from endpoint endpoint
 
 
 sinWorksProperly : Test
 sinWorksProperly =
     Test.fuzz2
-        fuzzer
+        angleFuzzer
         (Fuzz.floatRange 0 1)
         "sin works as expected"
         (\interval t ->
             let
                 valueInInterval =
-                    Interval.interpolate interval t
+                    Quantity.Interval.interpolate interval t
             in
-            sin valueInInterval |> expectValueIn (Interval.sin interval)
+            Angle.sin valueInInterval
+                |> expectFloatIn
+                    (Quantity.Interval.sin interval)
         )
 
 
 cosWorksProperly : Test
 cosWorksProperly =
     Test.fuzz2
-        fuzzer
+        angleFuzzer
         (Fuzz.floatRange 0 1)
         "cos works as expected"
         (\interval t ->
             let
                 valueInInterval =
-                    Interval.interpolate interval t
+                    Quantity.Interval.interpolate interval t
             in
-            cos valueInInterval |> expectValueIn (Interval.cos interval)
+            Angle.cos valueInInterval
+                |> expectFloatIn
+                    (Quantity.Interval.cos interval)
         )
 
 
 containingValues : Test
 containingValues =
-    Test.fuzz (Fuzz.list Fuzz.float)
+    Test.fuzz (Fuzz.list (Fuzz.map Quantity.float Fuzz.float))
         "containing"
         (\values ->
-            case Interval.containingValues values of
+            case Quantity.Interval.containingValues values of
                 Just interval ->
                     interval
                         |> Expect.all
                             (List.map
                                 (\value ->
                                     \theInterval ->
-                                        value |> expectValueIn theInterval
+                                        value |> expectQuantityIn theInterval
                                 )
                                 values
                             )
@@ -118,9 +179,9 @@ hull =
             (Fuzz.floatRange 0 1)
             "Value in first interval is in hull"
             (\firstInterval secondInterval t ->
-                Interval.interpolate firstInterval t
-                    |> expectValueIn
-                        (Interval.hull firstInterval secondInterval)
+                Quantity.Interval.interpolate firstInterval t
+                    |> expectQuantityIn
+                        (Quantity.Interval.hull firstInterval secondInterval)
             )
         , Test.fuzz3
             fuzzer
@@ -128,18 +189,24 @@ hull =
             (Fuzz.floatRange 0 1)
             "Value in second interval is in hull"
             (\firstInterval secondInterval t ->
-                Interval.interpolate secondInterval t
-                    |> expectValueIn
-                        (Interval.hull firstInterval secondInterval)
+                Quantity.Interval.interpolate secondInterval t
+                    |> expectQuantityIn
+                        (Quantity.Interval.hull firstInterval secondInterval)
             )
         ]
 
 
-expectDistinct : Interval Float -> Interval Float -> Expectation
+expectDistinct : Interval Float Unitless -> Interval Float Unitless -> Expectation
 expectDistinct firstInterval secondInterval =
     if
-        (Interval.minValue firstInterval > Interval.maxValue secondInterval)
-            || (Interval.maxValue firstInterval < Interval.minValue secondInterval)
+        (Quantity.Interval.minValue firstInterval
+            |> Quantity.greaterThan
+                (Quantity.Interval.maxValue secondInterval)
+        )
+            || (Quantity.Interval.maxValue firstInterval
+                    |> Quantity.lessThan
+                        (Quantity.Interval.minValue secondInterval)
+               )
     then
         Expect.pass
 
@@ -160,12 +227,12 @@ intersection =
         (Fuzz.floatRange 0 1)
         "Value in intersection is in both intervals"
         (\firstInterval secondInterval t ->
-            case Interval.intersection firstInterval secondInterval of
+            case Quantity.Interval.intersection firstInterval secondInterval of
                 Just intersectionInterval ->
-                    Interval.interpolate intersectionInterval t
+                    Quantity.Interval.interpolate intersectionInterval t
                         |> Expect.all
-                            [ expectValueIn firstInterval
-                            , expectValueIn secondInterval
+                            [ expectQuantityIn firstInterval
+                            , expectQuantityIn secondInterval
                             ]
 
                 Nothing ->
@@ -173,9 +240,9 @@ intersection =
         )
 
 
-expectContainedIn : Interval Float -> Interval Float -> Expectation
+expectContainedIn : Interval Float Unitless -> Interval Float Unitless -> Expectation
 expectContainedIn firstInterval secondInterval =
-    if Interval.isContainedIn firstInterval secondInterval then
+    if Quantity.Interval.isContainedIn firstInterval secondInterval then
         Expect.pass
 
     else
@@ -191,7 +258,7 @@ aggregate =
     Test.fuzz (Fuzz.list fuzzer)
         "aggregate"
         (\intervals ->
-            case Interval.aggregate intervals of
+            case Quantity.Interval.aggregate intervals of
                 Just aggregateInterval ->
                     aggregateInterval
                         |> Expect.all
@@ -219,10 +286,10 @@ intersectsAndIntersectionAreConsistent =
         (\firstInterval secondInterval ->
             let
                 intersects =
-                    Interval.intersects firstInterval secondInterval
+                    Quantity.Interval.intersects firstInterval secondInterval
 
                 maybeIntersection =
-                    Interval.intersection firstInterval secondInterval
+                    Quantity.Interval.intersection firstInterval secondInterval
             in
             intersects |> Expect.equal (maybeIntersection /= Nothing)
         )

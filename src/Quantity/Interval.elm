@@ -1,4 +1,4 @@
-module Interval exposing
+module Quantity.Interval exposing
     ( Interval
     , singleton, fromEndpoints, from, containingValues, aggregate, hull, intersection
     , endpoints, minValue, maxValue, midpoint, width
@@ -38,7 +38,8 @@ module Interval exposing
 
 -}
 
-import Float.Extra as Float
+import Angle exposing (Angle, Radians)
+import Interval
 import Quantity exposing (Quantity)
 
 
@@ -100,9 +101,9 @@ in either order).
     --> ( 2, 5 )
 
 -}
-from : number -> number -> Interval number
+from : Quantity number units -> Quantity number units -> Interval number units
 from firstValue secondValue =
-    if firstValue <= secondValue then
+    if firstValue |> Quantity.lessThanOrEqualTo secondValue then
         Interval ( firstValue, secondValue )
 
     else
@@ -122,9 +123,9 @@ is empty, returns `Nothing`.
     --> Nothing
 
 -}
-containingValues : List number -> Maybe (Interval number)
+containingValues : List (Quantity number units) -> Maybe (Interval number units)
 containingValues values =
-    Maybe.map2 from (List.minimum values) (List.maximum values)
+    Maybe.map2 from (Quantity.minimum values) (Quantity.maximum values)
 
 
 {-| Construct an interval containing both of the given intervals.
@@ -139,7 +140,7 @@ containingValues values =
     --> Interval.from 1 6
 
 -}
-hull : Interval number -> Interval number -> Interval number
+hull : Interval number units -> Interval number units -> Interval number units
 hull firstInterval secondInterval =
     let
         ( min1, max1 ) =
@@ -148,7 +149,7 @@ hull firstInterval secondInterval =
         ( min2, max2 ) =
             endpoints secondInterval
     in
-    Interval ( min min1 min2, max max1 max2 )
+    Interval ( Quantity.min min1 min2, Quantity.max max1 max2 )
 
 
 {-| Attempt to construct an interval containing all the values common to both
@@ -172,7 +173,7 @@ If the two intervals just touch, a singleton interval will be returned:
     --> Just (Interval.singleton 3)
 
 -}
-intersection : Interval number -> Interval number -> Maybe (Interval number)
+intersection : Interval number units -> Interval number units -> Maybe (Interval number units)
 intersection firstInterval secondInterval =
     let
         ( min1, max1 ) =
@@ -182,12 +183,12 @@ intersection firstInterval secondInterval =
             endpoints secondInterval
 
         maxOfMins =
-            max min1 min2
+            Quantity.max min1 min2
 
         minOfMaxes =
-            min max1 max2
+            Quantity.min max1 max2
     in
-    if maxOfMins <= minOfMaxes then
+    if maxOfMins |> Quantity.lessThanOrEqualTo minOfMaxes then
         Just (Interval ( maxOfMins, minOfMaxes ))
 
     else
@@ -207,7 +208,7 @@ the list is empty, returns `Nothing`.
     --> Nothing
 
 -}
-aggregate : List (Interval number) -> Maybe (Interval number)
+aggregate : List (Interval number units) -> Maybe (Interval number units)
 aggregate intervals =
     case intervals of
         first :: rest ->
@@ -234,7 +235,7 @@ is equivalent to (but more efficient than)
     )
 
 -}
-endpoints : Interval number -> ( number, number )
+endpoints : Interval number units -> ( Quantity number units, Quantity number units )
 endpoints (Interval intervalEndpoints) =
     intervalEndpoints
 
@@ -245,7 +246,7 @@ endpoints (Interval intervalEndpoints) =
     --> 1
 
 -}
-minValue : Interval number -> number
+minValue : Interval number units -> Quantity number units
 minValue interval =
     Tuple.first (endpoints interval)
 
@@ -256,7 +257,7 @@ minValue interval =
     --> 3
 
 -}
-maxValue : Interval number -> number
+maxValue : Interval number units -> Quantity number units
 maxValue interval =
     Tuple.second (endpoints interval)
 
@@ -267,13 +268,13 @@ maxValue interval =
     --> 2.5
 
 -}
-midpoint : Interval Float -> Float
+midpoint : Interval Float units -> Quantity Float units
 midpoint interval =
     let
         ( intervalMinValue, intervalMaxValue ) =
             endpoints interval
     in
-    intervalMinValue + 0.5 * (intervalMaxValue - intervalMinValue)
+    Quantity.midpoint intervalMinValue intervalMaxValue
 
 
 {-| Get the width of an interval.
@@ -282,13 +283,13 @@ midpoint interval =
     --> 4
 
 -}
-width : Interval number -> number
+width : Interval number units -> Quantity number units
 width interval =
     let
         ( intervalMinValue, intervalMaxValue ) =
             endpoints interval
     in
-    intervalMaxValue - intervalMinValue
+    intervalMaxValue |> Quantity.minus intervalMinValue
 
 
 {-| Interpolate between an interval's endpoints; a value of 0.0 corresponds to
@@ -315,33 +316,13 @@ _not_ "from the first `Interval.from` argument to the second":
     --> 2 -- not 8!
 
 -}
-interpolate : Interval Float -> Float -> Float
+interpolate : Interval Float units -> Float -> Quantity Float units
 interpolate interval t =
     let
         ( intervalMinValue, intervalMaxValue ) =
             endpoints interval
     in
-    Float.interpolateFrom intervalMinValue intervalMaxValue t
-
-
-parameter : Interval Float -> Float -> Float
-parameter interval value =
-    let
-        ( intervalMinValue, intervalMaxValue ) =
-            endpoints interval
-    in
-    if intervalMinValue < intervalMaxValue then
-        (value - intervalMinValue) / (intervalMaxValue - intervalMinValue)
-
-    else if value < intervalMinValue then
-        -1 / 0
-
-    else if value > intervalMaxValue then
-        1 / 0
-
-    else
-        -- value, intervalMinValue and intervalMaxValue are all equal
-        0
+    Quantity.interpolateFrom intervalMinValue intervalMaxValue t
 
 
 {-| Check if an interval contains a given value.
@@ -359,13 +340,14 @@ the interval:
     --> True
 
 -}
-contains : number -> Interval number -> Bool
+contains : Quantity number units -> Interval number units -> Bool
 contains value interval =
     let
         ( intervalMinValue, intervalMaxValue ) =
             endpoints interval
     in
-    intervalMinValue <= value && value <= intervalMaxValue
+    (intervalMinValue |> Quantity.lessThanOrEqualTo value)
+        && (value |> Quantity.lessThanOrEqualTo intervalMaxValue)
 
 
 {-| Check if two intervals touch or overlap (have any values in common).
@@ -387,7 +369,7 @@ intersection of two just-touching intervals):
     --> True
 
 -}
-intersects : Interval number -> Interval number -> Bool
+intersects : Interval number units -> Interval number units -> Bool
 intersects firstInterval secondInterval =
     let
         ( min1, max1 ) =
@@ -396,7 +378,8 @@ intersects firstInterval secondInterval =
         ( min2, max2 ) =
             endpoints secondInterval
     in
-    min1 <= max2 && max1 >= min2
+    (min1 |> Quantity.lessThanOrEqualTo max2)
+        && (max1 |> Quantity.greaterThanOrEqualTo min2)
 
 
 {-| Check if the second interval is fully contained in the first.
@@ -417,7 +400,7 @@ example would be written as:
     --> True
 
 -}
-isContainedIn : Interval number -> Interval number -> Bool
+isContainedIn : Interval number units -> Interval number units -> Bool
 isContainedIn firstInterval secondInterval =
     let
         ( min1, max1 ) =
@@ -426,7 +409,8 @@ isContainedIn firstInterval secondInterval =
         ( min2, max2 ) =
             endpoints secondInterval
     in
-    min1 <= min2 && max2 <= max1
+    (min2 |> Quantity.greaterThanOrEqualTo min1)
+        && (max2 |> Quantity.lessThanOrEqualTo max1)
 
 
 {-| Check if the interval is a singleton (the minimum and maximum values are the
@@ -439,7 +423,7 @@ same).
     --> False
 
 -}
-isSingleton : Interval number -> Bool
+isSingleton : Interval number units -> Bool
 isSingleton interval =
     let
         ( intervalMinValue, intervalMaxValue ) =
@@ -454,13 +438,16 @@ isSingleton interval =
     --> Interval.from 2 8
 
 -}
-shiftBy : number -> Interval number -> Interval number
+shiftBy : Quantity number units -> Interval number units -> Interval number units
 shiftBy delta interval =
     let
         ( intervalMinValue, intervalMaxValue ) =
             endpoints interval
     in
-    Interval ( intervalMinValue + delta, intervalMaxValue + delta )
+    Interval
+        ( intervalMinValue |> Quantity.plus delta
+        , intervalMaxValue |> Quantity.plus delta
+        )
 
 
 {-| Get the image of sin(x) applied on the interval.
@@ -472,10 +459,10 @@ shiftBy delta interval =
     --> Interval.from 0 1
 
 -}
-sin : Interval Float -> Interval Float
+sin : Interval Float Radians -> Interval.Interval Float
 sin interval =
     if isSingleton interval then
-        singleton (Basics.sin (minValue interval))
+        Interval.singleton (Angle.sin (minValue interval))
 
     else
         let
@@ -490,18 +477,18 @@ sin interval =
                     -1
 
                 else
-                    min (Basics.sin intervalMinValue)
-                        (Basics.sin intervalMaxValue)
+                    min (Angle.sin intervalMinValue)
+                        (Angle.sin intervalMaxValue)
 
             newMax =
                 if includesMax then
                     1
 
                 else
-                    max (Basics.sin intervalMinValue)
-                        (Basics.sin intervalMaxValue)
+                    max (Angle.sin intervalMinValue)
+                        (Angle.sin intervalMaxValue)
         in
-        fromEndpoints ( newMin, newMax )
+        Interval.fromEndpoints ( newMin, newMax )
 
 
 {-| Get the image of cos(x) applied on the interval.
@@ -513,10 +500,10 @@ sin interval =
     --> Interval.from -1 1
 
 -}
-cos : Interval Float -> Interval Float
+cos : Interval Float Radians -> Interval.Interval Float
 cos interval =
     if isSingleton interval then
-        singleton (Basics.cos (minValue interval))
+        Interval.singleton (Angle.cos (minValue interval))
 
     else
         let
@@ -531,35 +518,35 @@ cos interval =
                     -1
 
                 else
-                    min (Basics.cos intervalMinValue)
-                        (Basics.cos intervalMaxValue)
+                    min (Angle.cos intervalMinValue)
+                        (Angle.cos intervalMaxValue)
 
             newMax =
                 if includesMax then
                     1
 
                 else
-                    max (Basics.cos intervalMinValue)
-                        (Basics.cos intervalMaxValue)
+                    max (Angle.cos intervalMinValue)
+                        (Angle.cos intervalMaxValue)
         in
-        fromEndpoints ( newMin, newMax )
+        Interval.fromEndpoints ( newMin, newMax )
 
 
 {-| cos(x - pi/2) = sin(x), therefore if cos(interval - pi/2) includes
 the maximum/minimum, that means sin(interval) includes the maximum/minimum
 accordingly.
 -}
-sinIncludesMinMax : Interval Float -> ( Bool, Bool )
+sinIncludesMinMax : Interval Float Radians -> ( Bool, Bool )
 sinIncludesMinMax interval =
-    interval |> shiftBy (-pi / 2) |> cosIncludesMinMax
+    interval |> shiftBy (Angle.radians (-pi / 2)) |> cosIncludesMinMax
 
 
 {-| cos(x + pi) = -cos(x), therefore if cos(interval + pi) includes the maximum,
 that means cos(interval) includes the minimum.
 -}
-cosIncludesMinMax : Interval Float -> ( Bool, Bool )
+cosIncludesMinMax : Interval Float Radians -> ( Bool, Bool )
 cosIncludesMinMax interval =
-    ( interval |> shiftBy pi |> cosIncludesMax
+    ( interval |> shiftBy (Angle.radians pi) |> cosIncludesMax
     , interval |> cosIncludesMax
     )
 
@@ -569,16 +556,18 @@ If `minValue` and `maxValue` are in different branches
 (meaning diffrent values of k), then the interval must pass through
 2 pi \* k, which means the interval must include the maximum value.
 -}
-cosIncludesMax : Interval Float -> Bool
+cosIncludesMax : Interval Float Radians -> Bool
 cosIncludesMax interval =
     let
         ( intervalMinValue, intervalMaxValue ) =
             endpoints interval
 
         minBranch =
-            floor <| intervalMinValue / (2 * pi)
+            floor <|
+                Quantity.ratio intervalMinValue (Angle.radians (2 * pi))
 
         maxBranch =
-            floor <| intervalMaxValue / (2 * pi)
+            floor <|
+                Quantity.ratio intervalMaxValue (Angle.radians (2 * pi))
     in
     minBranch /= maxBranch
