@@ -44,8 +44,8 @@ import Quantity exposing (Quantity)
 
 
 {-| Represents a finite, closed interval with a minimum and maximum value, for
-example the interval from 3 to 5. An `Interval Int` represents a range of
-integers and an `Interval Float` represents a range of floating-point values.
+example the interval from 0 degrees to 360 degrees. An `Interval number units`
+represents a range of `Quantity number units` values.
 -}
 type Interval number units
     = Interval ( Quantity number units, Quantity number units )
@@ -53,8 +53,11 @@ type Interval number units
 
 {-| Construct a zero-width interval containing a single value.
 
-    Interval.singleton 3
-    --> Interval.fromEndpoints ( 3, 3 )
+    Interval.singleton (Length.meters 3)
+    --> Interval.fromEndpoints
+    -->     ( Length.meters 3
+    -->     , Length.meters 3
+    -->     )
 
 -}
 singleton : Quantity number units -> Interval number units
@@ -65,17 +68,22 @@ singleton value =
 {-| Construct an interval from its endpoints (the minimum and maximum values of
 the interval).
 
-    rgbRange =
-        Interval.fromEndpoints ( 0, 255 )
+    deliveryTime =
+        Interval.fromEndpoints
+            ( Duration.weeks 4
+            , Duration.weeks 6
+            )
 
-    alphaRange =
-        Interval.fromEndpoints ( 0, 1 )
+The two values should be given in order but will be swapped if necessary to
+ensure a valid interval is returned:
 
-The two values should be given in order but will be swapped if
-necessary to ensure a valid interval is returned:
-
-    Interval.endpoints (Interval.fromEndpoints ( 3, 2 ))
-    --> ( 2, 3 )
+    Interval.endpoints
+        ( Interval.fromEndpoints
+            ( Duration.minutes 3
+            , Duration.minutes 2
+            )
+        )
+    --> ( Duration.minutes 2, Duration.minutes 3 )
 
 -}
 fromEndpoints : ( Quantity number units, Quantity number units ) -> Interval number units
@@ -91,14 +99,20 @@ fromEndpoints givenEndpoints =
         Interval ( secondValue, firstValue )
 
 
-{-| Construct an interval containing the two given values (which can be provided
-in either order).
+{-| Construct an interval with the two given endpoints (which can be provided in
+either order).
 
-    Interval.endpoints (Interval.from 2 5)
-    --> ( 2, 5 )
+    Interval.endpoints <|
+        Interval.from
+            (Angle.degrees 0)
+            (Angle.degrees 180)
+    --> ( Angle.degrees 0, Angle.degrees 180 )
 
-    Interval.endpoints (Interval.from 5 2)
-    --> ( 2, 5 )
+    Interval.endpoints <|
+        Interval.from
+            (Angle.degrees 180)
+            (Angle.degrees 0)
+    --> ( Angle.degrees 0, Angle.degrees 180 )
 
 -}
 from : Quantity number units -> Quantity number units -> Interval number units
@@ -113,8 +127,15 @@ from firstValue secondValue =
 {-| Construct an interval containing all values in the given list. If the list
 is empty, returns `Nothing`.
 
-    Interval.containingValues [ 2, 1, 3 ]
-    --> Just (Interval.from 1 3)
+    Interval.containingValues
+        [ Length.meters 2
+        , Length.meters 1
+        , Length.meters 3
+        ]
+    --> Just <|
+    -->     Interval.from
+    -->         (Length.meters 1)
+    -->         (Length.meters 3)
 
     Interval.containingValues [ -3 ]
     --> Just (Interval.singleton -3)
@@ -131,13 +152,19 @@ containingValues values =
 {-| Construct an interval containing both of the given intervals.
 
     firstInterval =
-        Interval.from 1 2
+        Interval.from
+            (Duration.hours 1)
+            (Duration.hours 2)
 
     secondInterval =
-        Interval.from 3 6
+        Interval.from
+            (Duration.hours 3)
+            (Duration.hours 6)
 
     Interval.hull firstInterval secondInterval
-    --> Interval.from 1 6
+    --> Interval.from
+    -->     (Duration.hours 1)
+    -->     (Duration.hours 6)
 
 -}
 hull : Interval number units -> Interval number units -> Interval number units
@@ -156,21 +183,21 @@ hull firstInterval secondInterval =
 given intervals. If the intervals do not intersect, returns `Nothing`.
 
     Interval.intersection
-        (Interval.from 1 3)
-        (Interval.from 2 5)
-    --> Just (Interval.from 2 3)
+        (Interval.from (pixels 100) (pixels 300))
+        (Interval.from (pixels 200) (pixels 500))
+    --> Just (Interval.from (pixels 200) (pixels 300))
 
     Interval.intersection
-        (Interval.from 1 3)
-        (Interval.from 4 7)
+        (Interval.from (pixels 100) (pixels 300))
+        (Interval.from (pixels 400) (pixels 700))
     --> Nothing
 
 If the two intervals just touch, a singleton interval will be returned:
 
     Interval.intersection
-        (Interval.from 1 3)
-        (Interval.from 3 5)
-    --> Just (Interval.singleton 3)
+        (Interval.from (pixels 100) (pixels 300))
+        (Interval.from (pixels 300) (pixels 500))
+    --> Just (Interval.singleton (pixels 300))
 
 -}
 intersection : Interval number units -> Interval number units -> Maybe (Interval number units)
