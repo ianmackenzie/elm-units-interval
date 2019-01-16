@@ -462,12 +462,6 @@ isSingleton interval =
     intervalMinValue == intervalMaxValue
 
 
-{-| Add the given amount to both endpoints of the given interval.
-
-    Interval.shiftBy 3 (Interval.from -1 5)
-    --> Interval.from 2 8
-
--}
 shiftBy : Quantity number units -> Interval number units -> Interval number units
 shiftBy delta interval =
     let
