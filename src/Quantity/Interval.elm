@@ -229,10 +229,12 @@ intersection firstInterval secondInterval =
 the list is empty, returns `Nothing`.
 
     Interval.aggregate
-        [ Interval.singleton 2
-        , Interval.from 3 4
+        [ Interval.singleton (Length.feet 2)
+        , Interval.from
+            (Length.feet 3)
+            (Length.feet 4)
         ]
-    --> Just (Interval.from 2 4)
+    --> Just (Interval.from (Length.feet 2) (Length.feet 4))
 
     Interval.aggregate []
     --> Nothing
@@ -272,8 +274,11 @@ endpoints (Interval intervalEndpoints) =
 
 {-| Get the minimum value of an interval.
 
-    Interval.minValue (Interval.from 1 3)
-    --> 1
+    Interval.minValue <|
+        Interval.from
+            (Length.meters 1)
+            (Length.meters 3)
+    --> Length.meters 1
 
 -}
 minValue : Interval number units -> Quantity number units
@@ -283,8 +288,11 @@ minValue interval =
 
 {-| Get the maximum value of an interval.
 
-    Interval.maxValue (Interval.from 1 3)
-    --> 3
+    Interval.maxValue <|
+        Interval.from
+            (Length.meters 1)
+            (Length.meters 3)
+    --> Length.meters 3
 
 -}
 maxValue : Interval number units -> Quantity number units
@@ -294,8 +302,11 @@ maxValue interval =
 
 {-| Get the midpoint of an interval.
 
-    Interval.midpoint (Interval.from 1 4)
-    --> 2.5
+    Interval.midpoint <|
+        Interval.from
+            (Duration.seconds 1)
+            (Duration.seconds 4)
+    --> Duration.seconds 2.5
 
 -}
 midpoint : Interval Float units -> Quantity Float units
@@ -309,8 +320,11 @@ midpoint interval =
 
 {-| Get the width of an interval.
 
-    Interval.width (Interval.from 1 5)
-    --> 4
+    Interval.width <|
+        Interval.from
+            (Duration.seconds 1)
+            (Duration.seconds 4)
+    --> Duration.seconds 3
 
 -}
 width : Interval number units -> Quantity number units
@@ -327,23 +341,36 @@ the minimum value of the interval, a value of 0.5 corresponds to its midpoint
 and a value of 1.0 corresponds to its maximum value. Values less than 0.0 or
 greater than 1.0 can be used to extrapolate.
 
-    Interval.interpolate (Interval.from -1 5) 0
-    --> -1
+    oneTurn =
+        Interval.from (Angle.degrees 0) (Angle.degrees 360)
 
-    Interval.interpolate (Interval.from -1 5) 0.75
-    --> 3.5
+    Interval.interpolate oneTurn 0
+    --> Angle.degrees 0
 
-    Interval.interpolate (Interval.from -1 5) -0.5
-    --> -4
+    Interval.interpolate oneTurn 0.75
+    --> Angle.degrees 270
+
+    Interval.interpolate oneTurn -0.5
+    --> Angle.degrees -180
 
 Note that the interpolation is in fact from the minimum value to the maximum,
 _not_ "from the first `Interval.from` argument to the second":
 
-    Interval.interpolate (Interval.from 0 10) 0.2
-    --> 2
+    Interval.interpolate
+        (Interval.from
+            (Angle.degrees 0)
+            (Angle.degrees 180)
+        )
+        0.25
+    --> Angle.degrees 45
 
-    Interval.interpolate (Interval.from 10 0) 0.2
-    --> 2 -- not 8!
+    Interval.interpolate
+        (Interval.from
+            (Angle.degrees 180)
+            (Angle.degrees 0)
+        )
+        0.25
+    --> Angle.degrees 45 -- not 135!
 
 -}
 interpolate : Interval Float units -> Float -> Quantity Float units
@@ -357,16 +384,28 @@ interpolate interval t =
 
 {-| Check if an interval contains a given value.
 
-    Interval.contains 0 (Interval.from -1 3)
+    durationInterval =
+        Interval.from
+            (Duration.minutes 30)
+            (Duration.minutes 90)
+
+    durationInterval
+        |> Interval.contains
+            (Duration.hours 1)
     --> True
 
-    Interval.contains 5 (Interval.from -1 3)
+
+    durationInterval
+        |> Interval.contains
+            (Duration.hours 2)
     --> False
 
 The minimum and maximum values of an interval are considered to be contained in
 the interval:
 
-    Interval.contains 3 (Interval.from -1 3)
+    durationInterval
+        |> Interval.contains
+            (Duration.hours 0.5)
     --> True
 
 -}
@@ -382,20 +421,37 @@ contains value interval =
 
 {-| Check if two intervals touch or overlap (have any values in common).
 
-    Interval.from -5 5
-        |> Interval.intersects (Interval.from 0 10)
+    distanceInterval =
+        Interval.from
+            (Length.kilometers 5)
+            (Length.kilometers 10)
+
+    distanceInterval
+        |> Interval.intersects
+            (Interval.from
+                (Length.kilometers 8)
+                (Length.kilometers 12)
+            )
     --> True
 
-    Interval.from -5 5
-        |> Interval.intersects (Interval.from 10 20)
+    distanceInterval
+        |> Interval.intersects
+            (Interval.from
+                (Length.kilometers 12)
+                (Length.kilometers 15)
+            )
     --> False
 
 Intervals that just touch each other are considered to intersect (this is
 consistent with `intersection` which will return a zero-width interval for the
 intersection of two just-touching intervals):
 
-    Interval.from -5 5
-        |> Interval.intersects (Interval.from 5 10)
+    distanceInterval
+        |> Interval.intersects
+            (Interval.from
+                (Length.kilometers 10)
+                (Length.kilometers 15)
+            )
     --> True
 
 -}
@@ -414,19 +470,27 @@ intersects firstInterval secondInterval =
 
 {-| Check if the second interval is fully contained in the first.
 
-    Interval.from -5 5
-        |> Interval.isContainedIn (Interval.from 0 10)
-    --> False
+    angleInterval =
+        Interval.from
+            (Angle.degrees -30)
+            (Angle.degrees 30)
 
-    Interval.from -5 5
-        |> Interval.isContainedIn (Interval.from -10 10)
+    Interval.from (Angle.degrees -5) (Angle.degrees 15)
+        |> Interval.isContainedIn angleInterval
     --> True
 
-Be careful with the argument order! If not using the `|>` operator, the second
+    Interval.from (Angle.degrees 15) (Angle.degrees 45)
+        |> Interval.isContainedIn angleInterval
+    --> False
+
+Be careful with the argument order! If not using the `|>` operator, the first
 example would be written as:
 
-    Interval.isContainedIn (Interval.from -10 10)
-        (Interval.from -5 5)
+    Interval.isContainedIn angleInterval
+        (Interval.from
+            (Angle.degrees -5)
+            (Angle.degrees 15)
+        )
     --> True
 
 -}
@@ -446,10 +510,12 @@ isContainedIn firstInterval secondInterval =
 {-| Check if the interval is a singleton (the minimum and maximum values are the
 same).
 
-    Interval.isSingleton (Interval.fromEndpoints ( 2, 2 ))
+    Interval.isSingleton
+        (Interval.from (Length.meters 2) (Length.meters 2))
     --> True
 
-    Interval.isSingleton (Interval.fromEndpoints ( 2, 3 ))
+    Interval.isSingleton
+        (Interval.from (Length.meters 2) (Length.meters 3))
     --> False
 
 -}
@@ -476,11 +542,17 @@ shiftBy delta interval =
 
 {-| Get the image of sin(x) applied on the interval.
 
-    Interval.sin (Interval.from 0 (degrees 45))
-    --> Interval.from 0 0.7071
+    Quantity.Interval.sin <|
+        Quantity.Interval.from
+            (Angle.degrees 0)
+            (Angle.degrees 45)
+    --> Interval.Interval.from 0 0.7071
 
-    Interval.sin (Interval.from 0 pi)
-    --> Interval.from 0 1
+    Quantity.Interval.sin <|
+        Quantity.Interval.from
+            (Angle.degrees 0)
+            (Angle.degrees 180)
+    --> Interval.Interval.from 0 1
 
 -}
 sin : Interval Float Radians -> Interval.Interval Float
@@ -517,11 +589,17 @@ sin interval =
 
 {-| Get the image of cos(x) applied on the interval.
 
-    Interval.cos (Interval.from 0 (degrees 45))
-    --> Interval.from 0.7071 1
+    Quantity.Interval.cos <|
+        Quantity.Interval.from
+            (Angle.degrees 0)
+            (Angle.degrees 45)
+    --> Interval.Interval.from 0.7071 1
 
-    Interval.cos (Interval.from 0 pi)
-    --> Interval.from -1 1
+    Quantity.Interval.cos <|
+        Quantity.Interval.from
+            (Angle.degrees 0)
+            (Angle.degrees 180)
+    --> Interval.Interval.from -1 1
 
 -}
 cos : Interval Float Radians -> Interval.Interval Float
