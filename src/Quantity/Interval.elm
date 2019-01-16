@@ -4,7 +4,7 @@ module Quantity.Interval exposing
     , endpoints, minValue, maxValue, midpoint, width
     , interpolate
     , sin, cos
-    , contains, intersects, isContainedIn
+    , contains, intersects, isContainedIn, isSingleton
     )
 
 {-|
@@ -34,7 +34,7 @@ module Quantity.Interval exposing
 
 # Queries
 
-@docs contains, intersects, isContainedIn
+@docs contains, intersects, isContainedIn, isSingleton
 
 -}
 
