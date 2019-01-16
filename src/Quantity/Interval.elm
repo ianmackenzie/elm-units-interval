@@ -140,8 +140,8 @@ is empty, returns `Nothing`.
     -->         (Length.meters 1)
     -->         (Length.meters 3)
 
-    Interval.containingValues [ -3 ]
-    --> Just (Interval.singleton -3)
+    Interval.containingValues [ Length.meters -3 ]
+    --> Just (Interval.singleton (Length.meters -3))
 
     Interval.containingValues []
     --> Nothing
