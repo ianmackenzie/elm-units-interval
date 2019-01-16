@@ -27,7 +27,15 @@ module Quantity.Interval exposing
 @docs interpolate
 
 
-# Arithmetic
+# Trigonometry
+
+Note that in the same way that `Angle.sin` and `Angle.cos` from the `elm-units`
+package take an `Angle` (a `Quantity Float Radians`) value and return a plain
+`Float`, `sin` and `cos` in this package take an angle `Interval` from this
+package (a `Quantity.Interval.Interval Float Radians`) and return a plain
+`Interval Float` from the `elm-interval` package (an `Interval.Interval Float`).
+As a result, the examples for `sin` and `cos` below use fully qualified module
+names to avoid ambiguity.
 
 @docs sin, cos
 
@@ -540,7 +548,9 @@ shiftBy delta interval =
         )
 
 
-{-| Get the image of sin(x) applied on the interval.
+{-| For a given range of angle values, find the corresponding range of sine
+values. Takes an `Interval` from this module and returns an `Interval` from the
+`elm-interval` package.
 
     Quantity.Interval.sin <|
         Quantity.Interval.from
@@ -587,7 +597,9 @@ sin interval =
         Interval.fromEndpoints ( newMin, newMax )
 
 
-{-| Get the image of cos(x) applied on the interval.
+{-| For a given range of angle values, find the corresponding range of sine
+values. Takes an `Interval` from this module and returns an `Interval` from the
+`elm-interval` package.
 
     Quantity.Interval.cos <|
         Quantity.Interval.from
