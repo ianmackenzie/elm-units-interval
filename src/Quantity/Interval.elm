@@ -45,7 +45,10 @@ import Quantity exposing (Quantity)
 
 {-| Represents a finite, closed interval with a minimum and maximum value, for
 example the interval from 0 degrees to 360 degrees. An `Interval number units`
-represents a range of `Quantity number units` values.
+represents a range of [`Quantity number units`][1] values.
+
+[1]: https://package.elm-lang.org/packages/ianmackenzie/elm-units/latest/Quantity
+
 -}
 type Interval number units
     = Interval ( Quantity number units, Quantity number units )
