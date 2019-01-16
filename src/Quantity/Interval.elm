@@ -38,7 +38,7 @@ module Quantity.Interval exposing
 
 -}
 
-import Angle exposing (Angle, Radians)
+import Angle exposing (Radians)
 import Interval
 import Quantity exposing (Quantity)
 
