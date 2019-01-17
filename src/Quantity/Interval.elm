@@ -556,13 +556,13 @@ values. Takes an `Interval` from this module and returns an `Interval` from the
         Quantity.Interval.from
             (Angle.degrees 0)
             (Angle.degrees 45)
-    --> Interval.Interval.from 0 0.7071
+    --> Interval.from 0 0.7071
 
     Quantity.Interval.sin <|
         Quantity.Interval.from
             (Angle.degrees 0)
             (Angle.degrees 180)
-    --> Interval.Interval.from 0 1
+    --> Interval.from 0 1
 
 -}
 sin : Interval Float Radians -> Interval.Interval Float
@@ -605,13 +605,13 @@ values. Takes an `Interval` from this module and returns an `Interval` from the
         Quantity.Interval.from
             (Angle.degrees 0)
             (Angle.degrees 45)
-    --> Interval.Interval.from 0.7071 1
+    --> Interval.from 0.7071 1
 
     Quantity.Interval.cos <|
         Quantity.Interval.from
             (Angle.degrees 0)
             (Angle.degrees 180)
-    --> Interval.Interval.from -1 1
+    --> Interval.from -1 1
 
 -}
 cos : Interval Float Radians -> Interval.Interval Float
