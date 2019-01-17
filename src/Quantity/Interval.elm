@@ -7,7 +7,12 @@ module Quantity.Interval exposing
     , sin, cos
     )
 
-{-|
+{-| Note: most examples assume that you have imported this module as
+
+    import Quantity.Interval as Interval
+
+The only exceptions are the examples for `sin` and `cos`; see the
+[Trigonometry](#trigonometry) section for details.
 
 @docs Interval
 
@@ -39,8 +44,10 @@ package take an `Angle` (a `Quantity Float Radians`) value and return a plain
 `Float`, `sin` and `cos` in this package take an angle `Interval` from this
 package (a `Quantity.Interval.Interval Float Radians`) and return a plain
 `Interval Float` from the `elm-interval` package (an `Interval.Interval Float`).
+
 As a result, the examples for `sin` and `cos` below use fully qualified module
-names to avoid ambiguity.
+names to avoid ambiguity, so `Interval` refers to the `Interval` module from
+`elm-interval` and not the `Quantity.Interval` module from this package.
 
 @docs sin, cos
 
@@ -77,7 +84,7 @@ singleton value =
 
 
 {-| Construct an interval from its endpoints (the minimum and maximum values of
-the interval).
+the interval). For example, the infamous old "allow 4 to 6 weeks for delivery":
 
     deliveryTime =
         Interval.fromEndpoints
@@ -326,7 +333,7 @@ midpoint interval =
     Quantity.midpoint intervalMinValue intervalMaxValue
 
 
-{-| Get the width of an interval.
+{-| Get the width of an interval. This will never be negative.
 
     Interval.width <|
         Interval.from
