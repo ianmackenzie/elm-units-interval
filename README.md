@@ -1,4 +1,4 @@
-# elm-quantity-interval
+# elm-units-interval
 
 This package implements an `Interval` type similar to that from [`elm-interval`][elm-interval]
 but based on the `Quantity` type from [`elm-units`][elm-units].
