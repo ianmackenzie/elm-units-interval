@@ -2,9 +2,9 @@ module Quantity.Interval exposing
     ( Interval
     , singleton, fromEndpoints, from, containingValues, aggregate, hull, intersection
     , endpoints, minValue, maxValue, midpoint, width
+    , contains, intersects, isContainedIn, isSingleton
     , interpolate
     , sin, cos
-    , contains, intersects, isContainedIn, isSingleton
     )
 
 {-|
@@ -20,6 +20,11 @@ module Quantity.Interval exposing
 # Properties
 
 @docs endpoints, minValue, maxValue, midpoint, width
+
+
+# Queries
+
+@docs contains, intersects, isContainedIn, isSingleton
 
 
 # Interpolation
@@ -38,11 +43,6 @@ As a result, the examples for `sin` and `cos` below use fully qualified module
 names to avoid ambiguity.
 
 @docs sin, cos
-
-
-# Queries
-
-@docs contains, intersects, isContainedIn, isSingleton
 
 -}
 
