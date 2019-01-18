@@ -3,7 +3,7 @@
     "name": "ianmackenzie/elm-units-interval",
     "summary": "Version of elm-interval based on elm-units",
     "license": "MPL-2.0",
-    "version": "2.0.0",
+    "version": "1.0.0",
     "exposed-modules": [
         "Quantity.Interval"
     ],
