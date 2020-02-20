@@ -5,11 +5,13 @@
     "license": "MPL-2.0",
     "version": "1.0.0",
     "exposed-modules": [
-        "Quantity.Interval"
+        "Quantity.Interval",
+        "Temperature.Interval"
     ],
     "elm-version": "0.19.0 <= v < 0.20.0",
     "dependencies": {
         "elm/core": "1.0.0 <= v < 2.0.0",
+        "ianmackenzie/elm-float-extra": "1.1.0 <= v < 2.0.0",
         "ianmackenzie/elm-interval": "2.0.0 <= v < 3.0.0",
         "ianmackenzie/elm-units": "2.0.0 <= v < 3.0.0"
     },
