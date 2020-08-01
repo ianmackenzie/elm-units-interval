@@ -1,7 +1,12 @@
 # elm-units-interval
 
-This package implements an `Interval` type similar to that from [`elm-interval`][elm-interval]
-but based on the `Quantity` type from [`elm-units`][elm-units].
+This package lets you work with ranges of values (intervals) based on the
+`Quantity` type from [`elm-units`][elm-units]. You can do things like:
+
+- Check if a given value is within an interval
+- Construct intervals from lists of values or other intervals
+- Find the intersection of two intervals
+- Perform [arithmetic][interval-arithmetic] on intervals
 
 ```elm
 import Quantity.Interval as Interval exposing (Interval)
@@ -14,11 +19,11 @@ angleRange =
 
 widthRange : Interval Int Pixels
 widthRange =
-    Interval.from (Pixels.pixels 100) (Pixels.pixels 300)
+    Interval.from (Pixels.int 100) (Pixels.int 300)
 ```
 
 Various functionality is included for constructing intervals (including as the
-hull or intersection of other intervals) and checking for overlap, intersection
+union or intersection of other intervals) and checking for overlap, intersection
 or containment:
 
 ```elm
@@ -32,14 +37,15 @@ distanceInterval =
 Interval.endpoints distanceInterval
 --> ( Length.meters 10, Length.meters 20 )
 
-Interval.containingValues
-    [ Length.feet 2
-    , Length.feet 1
-    , Length.feet 3
-    ]
---> Just (Interval.from (Length.feet 1) (Length.feet 3))
-
 Interval.hull
+    (Length.feet 5)
+    [ Length.feet 3
+    , Length.feet 2
+    , Length.feet 4
+    ]
+--> Interval.from (Length.feet 2) (Length.feet 5)
+
+Interval.union
     (Interval.from
         (Duration.minutes 1)
         (Duration.minutes 2)
@@ -74,5 +80,10 @@ Interval.from (Angle.radians 0) (Angle.radians pi)
 --> False
 ```
 
+Most functionality is contained in the [`Quantity.Interval`](Quantity-Interval)
+module, but some functionality specific to particular kinds of intervals is
+contained in [`Angle.Interval`](Angle-Interval) and [`Temperature.Interval`](Temperature-Interval).
+
 [elm-interval]: https://package.elm-lang.org/packages/ianmackenzie/elm-interval/latest/
 [elm-units]: https://package.elm-lang.org/packages/ianmackenzie/elm-units/latest/
+[interval-arithmetic]: https://en.wikipedia.org/wiki/Interval_arithmetic

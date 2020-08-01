@@ -1,25 +1,50 @@
 module Quantity.Interval exposing
     ( Interval
-    , singleton, fromEndpoints, from, containingValues, aggregate, hull, intersection
+    , from, fromEndpoints, singleton
+    , union, intersection
+    , hull, hullN, hullOf, hullOfN, hull3
+    , aggregate, aggregateN, aggregateOf, aggregateOfN, aggregate3
     , endpoints, minValue, maxValue, midpoint, width
-    , contains, intersects, isContainedIn, isSingleton
-    , interpolate
-    , sin, cos
+    , contains, isContainedIn, intersects, isSingleton
+    , interpolate, interpolationParameter
+    , negate, add, subtract, multiplyBy, divideBy, half, twice
+    , plus, minus
     )
 
-{-| Note: most examples assume that you have imported this module as
+{-| This modules contains most of the core functionality for creating and
+working with `Interval` values.
+
+Note: most examples assume that you have imported this module as
 
     import Quantity.Interval as Interval
-
-The only exceptions are the examples for `sin` and `cos`; see the
-[Trigonometry](#trigonometry) section for details.
 
 @docs Interval
 
 
 # Constructors
 
-@docs singleton, fromEndpoints, from, containingValues, aggregate, hull, intersection
+@docs from, fromEndpoints, singleton
+
+
+## Booleans
+
+@docs union, intersection
+
+
+## Hull
+
+These functions let you construct an `Interval` containing one or more input
+values.
+
+@docs hull, hullN, hullOf, hullOfN, hull3
+
+
+## Aggregation
+
+These functions let you 'aggregate' one or more intervals into a single larger
+interval that contains all of them.
+
+@docs aggregate, aggregateN, aggregateOf, aggregateOfN, aggregate3
 
 
 # Properties
@@ -29,40 +54,36 @@ The only exceptions are the examples for `sin` and `cos`; see the
 
 # Queries
 
-@docs contains, intersects, isContainedIn, isSingleton
+@docs contains, isContainedIn, intersects, isSingleton
 
 
 # Interpolation
 
-@docs interpolate
+@docs interpolate, interpolationParameter
 
 
-# Trigonometry
+# Arithmetic
 
-Note that in the same way that `Angle.sin` and `Angle.cos` from the `elm-units`
-package take an `Angle` (a `Quantity Float Radians`) value and return a plain
-`Float`, `sin` and `cos` in this package take an angle `Interval` from this
-package (a `Quantity.Interval.Interval Float Radians`) and return a plain
-`Interval Float` from the `elm-interval` package (an `Interval.Interval Float`).
+These functions let you do math with `Interval` values, following the rules of
+[interval arithmetic](https://en.wikipedia.org/wiki/Interval_arithmetic).
 
-As a result, the examples for `sin` and `cos` below use fully qualified module
-names to avoid ambiguity, so `Interval` refers to the `Interval` module from
-`elm-interval` and not the `Quantity.Interval` module from this package.
-
-@docs sin, cos
+@docs negate, add, subtract, multiplyBy, divideBy, half, twice
+@docs plus, minus
 
 -}
 
-import Angle exposing (Radians)
-import Interval
-import Quantity exposing (Quantity)
+import Quantity exposing (Quantity(..))
 
 
-{-| Represents a finite, closed interval with a minimum and maximum value, for
-example the interval from 0 degrees to 360 degrees. An `Interval number units`
-represents a range of [`Quantity number units`][1] values.
+{-| Represents a finite, closed interval with a minimum and maximum value.
 
-[1]: https://package.elm-lang.org/packages/ianmackenzie/elm-units/latest/Quantity
+The two type parameters match those of the [`Quantity`](https://package.elm-lang.org/packages/ianmackenzie/elm-units/latest/Quantity)
+type from `elm-units`. For example, an `Interval Int Pixels` might represent a
+value between 200 and 300 pixels, and an `Interval Float Meters` might represent
+a value between 2.5 and 3.7 centimeters. (As with the `Quantity` type, the
+`units` type parameter refers to the _base_ unit of a particular quantity type;
+lengths in meters, centimeters, feet, miles etc. are all internally stored in
+meters.)
 
 -}
 type Interval number units
@@ -84,182 +105,386 @@ singleton value =
 
 
 {-| Construct an interval from its endpoints (the minimum and maximum values of
-the interval). For example, the infamous old "allow 4 to 6 weeks for delivery":
+the interval).
 
-    deliveryTime =
+    highwayCarSpeeds =
         Interval.fromEndpoints
-            ( Duration.weeks 4
-            , Duration.weeks 6
+            ( Speed.kilometersPerHour 90
+            , Speed.kilometersPerHour 130
             )
 
-The two values should be given in order but will be swapped if necessary to
-ensure a valid interval is returned:
+The two values should be given in order but will be swapped if
+necessary to ensure a valid interval is returned:
 
-    Interval.endpoints
-        ( Interval.fromEndpoints
-            ( Duration.minutes 3
-            , Duration.minutes 2
+    Interval.endpoints <|
+        Interval.fromEndpoints
+            ( Speed.kilometersPerHour 130
+            , Speed.kilometersPerHour 90
             )
-        )
-    --> ( Duration.minutes 2, Duration.minutes 3 )
+    --> ( Speed.kilometersPerHour 90
+    --> , Speed.kilometersPerHour 130
+    --> )
 
 -}
 fromEndpoints : ( Quantity number units, Quantity number units ) -> Interval number units
 fromEndpoints givenEndpoints =
     let
-        ( firstValue, secondValue ) =
+        ( Quantity a, Quantity b ) =
             givenEndpoints
     in
-    if firstValue |> Quantity.lessThanOrEqualTo secondValue then
+    if a <= b then
         Interval givenEndpoints
 
     else
-        Interval ( secondValue, firstValue )
+        Interval ( Quantity b, Quantity a )
 
 
-{-| Construct an interval with the two given endpoints (which can be provided in
-either order).
+{-| Construct an interval containing the two given values (which can be provided
+in either order).
 
-    Interval.endpoints <|
+    -- "The heights of people participating in the study
+    -- ranged from 1.2 to 1.9 meters"
+    heightRange =
         Interval.from
-            (Angle.degrees 0)
-            (Angle.degrees 180)
-    --> ( Angle.degrees 0, Angle.degrees 180 )
+            (Length.meters 1.2)
+            (Length.meters 1.9)
 
-    Interval.endpoints <|
+    -- "Please allow 4 to 6 weeks for delivery"
+    estimatedShippingTime =
         Interval.from
-            (Angle.degrees 180)
-            (Angle.degrees 0)
-    --> ( Angle.degrees 0, Angle.degrees 180 )
+            (Duration.weeks 4)
+            (Duration.weeks 6)
 
 -}
 from : Quantity number units -> Quantity number units -> Interval number units
-from firstValue secondValue =
-    if firstValue |> Quantity.lessThanOrEqualTo secondValue then
-        Interval ( firstValue, secondValue )
+from (Quantity a) (Quantity b) =
+    if a <= b then
+        Interval ( Quantity a, Quantity b )
 
     else
-        Interval ( secondValue, firstValue )
+        Interval ( Quantity b, Quantity a )
 
 
-{-| Construct an interval containing all values in the given list. If the list
-is empty, returns `Nothing`.
+{-| Find the interval containing one or more input values, by passing the first
+value as the first argument and then a list of all other values as the second
+argument. For example, to find the interval containing the values 5 cm, 2 cm,
+3 cm and 4 cm:
 
-    Interval.containingValues
-        [ Length.meters 2
-        , Length.meters 1
-        , Length.meters 3
+    Interval.hull
+        (Length.centimeters 5)
+        [ Length.centimeters 3
+        , Length.centimeters 2
+        , Length.centimeters 4
+        ]
+    --> Interval.from
+    -->     (Length.centimeters 2)
+    -->     (Length.centimeters 5)
+
+Why pass the first and all other values as separate arguments? It lets this
+function return an `Interval` instead of a `Maybe Interval`. If there was just a
+single list as an argument, then this function would have to handle the case of
+an empty list being passed by returning `Nothing`. As a result, when using this
+function you often end up using it within a `case` expression:
+
+    case values of
+        [] ->
+            -- some default behavior
+
+        first :: rest ->
+            let
+                interval =
+                    Interval.hull first rest
+            in
+            -- normal behavior using 'interval'
+
+If you do want the simpler behavior of taking a single list and returning a
+`Maybe Interval`, check out [`hullN`](#hullN).
+
+-}
+hull : Quantity number units -> List (Quantity number units) -> Interval number units
+hull (Quantity x0) rest =
+    hullHelp x0 x0 rest
+
+
+hullHelp : number -> number -> List (Quantity number units) -> Interval number units
+hullHelp a b values =
+    case values of
+        (Quantity x) :: rest ->
+            hullHelp (min a x) (max b x) rest
+
+        [] ->
+            Interval ( Quantity a, Quantity b )
+
+
+{-| Construct an interval containing the three given values;
+
+    Interval.hull3 a b c
+
+is equivalent to
+
+    Interval.hull a [ b, c ]
+
+but is more efficient. (If you're looking for a `hull2` function, [`from`](#from)
+should do what you want.)
+
+-}
+hull3 :
+    Quantity number units
+    -> Quantity number units
+    -> Quantity number units
+    -> Interval number units
+hull3 (Quantity a) (Quantity b) (Quantity c) =
+    Interval
+        ( Quantity (min a (min b c))
+        , Quantity (max a (max b c))
+        )
+
+
+{-| Attempt to construct an interval containing all _N_ values in the given
+list. If the list is empty, returns `Nothing`. If you know you have at least one
+value, you can use [`hull`](#hull) instead.
+
+    Interval.hullN
+        [ Duration.hours 2
+        , Duration.hours 1
+        , Duration.hours 3
         ]
     --> Just <|
     -->     Interval.from
-    -->         (Length.meters 1)
-    -->         (Length.meters 3)
+    -->         (Duration.hours 1)
+    -->         (Duration.hours 3)
 
-    Interval.containingValues [ Length.meters -3 ]
-    --> Just (Interval.singleton (Length.meters -3))
+    Interval.hullN [ Duration.hours 5]
+    --> Just (Interval.singleton (Duration.hours 5))
 
-    Interval.containingValues []
+    Interval.hullN []
     --> Nothing
 
 -}
-containingValues : List (Quantity number units) -> Maybe (Interval number units)
-containingValues values =
-    Maybe.map2 from (Quantity.minimum values) (Quantity.maximum values)
+hullN : List (Quantity number units) -> Maybe (Interval number units)
+hullN values =
+    case values of
+        first :: rest ->
+            Just (hull first rest)
+
+        [] ->
+            Nothing
+
+
+{-| Like [`hull`](#hull), but lets you work on any kind of item as long as a
+`Quantity` of some kind can be extracted from it. For example, if you had
+
+    type alias Person =
+        { name : String
+        , age : Duration
+        }
+
+then given some people you could find their range of ages as an `Interval Float
+Seconds` using
+
+    Interval.hullOf .age
+        firstPerson
+        [ secondPerson
+        , thirdPerson
+        , fourthPerson
+        ]
+
+See also [`hullOfN`](#hullOfN).
+
+-}
+hullOf : (a -> Quantity number units) -> a -> List a -> Interval number units
+hullOf getValue first rest =
+    let
+        (Quantity x0) =
+            getValue first
+    in
+    hullOfHelp x0 x0 getValue rest
+
+
+hullOfHelp : number -> number -> (a -> Quantity number units) -> List a -> Interval number units
+hullOfHelp a b getValue list =
+    case list of
+        first :: rest ->
+            let
+                (Quantity x) =
+                    getValue first
+            in
+            hullOfHelp (min a x) (max b x) getValue rest
+
+        [] ->
+            Interval ( Quantity a, Quantity b )
+
+
+{-| Combination of [`hullOf`](#hullOf) and [`hullN`](#hullN).
+-}
+hullOfN : (a -> Quantity number units) -> List a -> Maybe (Interval number units)
+hullOfN getValue items =
+    case items of
+        first :: rest ->
+            Just (hullOf getValue first rest)
+
+        [] ->
+            Nothing
 
 
 {-| Construct an interval containing both of the given intervals.
 
     firstInterval =
-        Interval.from
-            (Duration.hours 1)
-            (Duration.hours 2)
+        Interval.from (Length.feet 1) (Length.feet 2)
 
     secondInterval =
-        Interval.from
-            (Duration.hours 3)
-            (Duration.hours 6)
+        Interval.from (Length.feet 3) (Length.feet 6)
 
-    Interval.hull firstInterval secondInterval
-    --> Interval.from
-    -->     (Duration.hours 1)
-    -->     (Duration.hours 6)
+    Interval.union firstInterval secondInterval
+    --> Interval.from (Length.feet 1) (Length.feet 6)
+
+(Note that this is not strictly speaking a 'union' in the precise mathematical
+sense, since the result will contain values that are _in between_ the two given
+intervals and not actually _in_ either of them if those two intervals do not
+overlap.)
 
 -}
-hull : Interval number units -> Interval number units -> Interval number units
-hull firstInterval secondInterval =
-    let
-        ( min1, max1 ) =
-            endpoints firstInterval
-
-        ( min2, max2 ) =
-            endpoints secondInterval
-    in
-    Interval ( Quantity.min min1 min2, Quantity.max max1 max2 )
+union : Interval number units -> Interval number units -> Interval number units
+union (Interval ( Quantity a1, Quantity b1 )) (Interval ( Quantity a2, Quantity b2 )) =
+    Interval ( Quantity (min a1 a2), Quantity (max b1 b2) )
 
 
 {-| Attempt to construct an interval containing all the values common to both
 given intervals. If the intervals do not intersect, returns `Nothing`.
 
     Interval.intersection
-        (Interval.from (pixels 100) (pixels 300))
-        (Interval.from (pixels 200) (pixels 500))
-    --> Just (Interval.from (pixels 200) (pixels 300))
+        (Interval.from (Mass.grams 1) (Mass.grams 3))
+        (Interval.from (Mass.grams 2) (Mass.grams 5))
+    --> Just (Interval.from (Mass.grams 2) (Mass.grams 3))
 
     Interval.intersection
-        (Interval.from (pixels 100) (pixels 300))
-        (Interval.from (pixels 400) (pixels 700))
+        (Interval.from (Mass.grams 1) (Mass.grams 3))
+        (Interval.from (Mass.grams 4) (Mass.grams 7))
     --> Nothing
 
 If the two intervals just touch, a singleton interval will be returned:
 
     Interval.intersection
-        (Interval.from (pixels 100) (pixels 300))
-        (Interval.from (pixels 300) (pixels 500))
-    --> Just (Interval.singleton (pixels 300))
+        (Interval.from (Mass.grams 1) (Mass.grams 3))
+        (Interval.from (Mass.grams 3) (Mass.grams 5))
+    --> Just (Interval.singleton (Mass.grams 3))
 
 -}
 intersection : Interval number units -> Interval number units -> Maybe (Interval number units)
-intersection firstInterval secondInterval =
+intersection (Interval ( Quantity a1, Quantity b1 )) (Interval ( Quantity a2, Quantity b2 )) =
     let
-        ( min1, max1 ) =
-            endpoints firstInterval
+        maxA =
+            max a1 a2
 
-        ( min2, max2 ) =
-            endpoints secondInterval
-
-        maxOfMins =
-            Quantity.max min1 min2
-
-        minOfMaxes =
-            Quantity.min max1 max2
+        minB =
+            min b1 b2
     in
-    if maxOfMins |> Quantity.lessThanOrEqualTo minOfMaxes then
-        Just (Interval ( maxOfMins, minOfMaxes ))
+    if maxA <= minB then
+        Just (Interval ( Quantity maxA, Quantity minB ))
 
     else
         Nothing
 
 
-{-| Construct an interval containing all of the intervals in the given list. If
-the list is empty, returns `Nothing`.
+{-| Construct an interval containing one or more given intervals:
 
     Interval.aggregate
-        [ Interval.singleton (Length.feet 2)
-        , Interval.from
+        (Interval.singleton (Length.feet 2))
+        [ Interval.from
             (Length.feet 3)
             (Length.feet 4)
         ]
-    --> Just (Interval.from (Length.feet 2) (Length.feet 4))
+    --> Interval.from (Length.feet 2) (Length.feet 4)
 
-    Interval.aggregate []
-    --> Nothing
+Works much like [`hull`](#hull). See also [`aggregateN`](#aggregateN).
 
 -}
-aggregate : List (Interval number units) -> Maybe (Interval number units)
-aggregate intervals =
+aggregate : Interval number units -> List (Interval number units) -> Interval number units
+aggregate (Interval ( Quantity a, Quantity b )) rest =
+    aggregateHelp a b rest
+
+
+aggregateHelp : number -> number -> List (Interval number units) -> Interval number units
+aggregateHelp a b intervals =
+    case intervals of
+        (Interval ( Quantity c, Quantity d )) :: rest ->
+            aggregateHelp (min a c) (max b d) rest
+
+        [] ->
+            Interval ( Quantity a, Quantity b )
+
+
+{-| Special case of [`aggregate`](#aggregate) for the case of three intervals;
+
+    Interval.aggregate3 first second third
+
+is equivalent to
+
+    Interval.aggregate first [ second, third ]
+
+but is more efficient. (If you're looking for an `aggregate2` function,
+[`union`](#union) should do what you want.)
+
+-}
+aggregate3 :
+    Interval number units
+    -> Interval number units
+    -> Interval number units
+    -> Interval number units
+aggregate3 (Interval ( Quantity a1, Quantity b1 )) (Interval ( Quantity a2, Quantity b2 )) (Interval ( Quantity a3, Quantity b3 )) =
+    Interval
+        ( Quantity (min a1 (min a2 a3))
+        , Quantity (max b1 (max b2 b3))
+        )
+
+
+{-| Attemp to construct an interval containing all of the intervals in the given
+list. If the list is empty, returns `Nothing`. If you know you have at least one
+interval, you can use [`aggregate`](#aggregate) instead.
+-}
+aggregateN : List (Interval number units) -> Maybe (Interval number units)
+aggregateN intervals =
     case intervals of
         first :: rest ->
-            Just (List.foldl hull first rest)
+            Just (aggregate first rest)
+
+        [] ->
+            Nothing
+
+
+{-| Like [`aggregate`](#aggregate), but lets you work on any kind of item as
+long as an interval can be generated from it (similar to [`hullOf`](#hullOf)).
+-}
+aggregateOf : (a -> Interval number units) -> a -> List a -> Interval number units
+aggregateOf getInterval first rest =
+    let
+        (Interval ( Quantity a, Quantity b )) =
+            getInterval first
+    in
+    aggregateOfHelp a b getInterval rest
+
+
+aggregateOfHelp : number -> number -> (a -> Interval number units) -> List a -> Interval number units
+aggregateOfHelp a b getInterval items =
+    case items of
+        first :: rest ->
+            let
+                (Interval ( Quantity c, Quantity d )) =
+                    getInterval first
+            in
+            aggregateOfHelp (min a c) (max b d) getInterval rest
+
+        [] ->
+            Interval ( Quantity a, Quantity b )
+
+
+{-| Combination of [`aggregateOf`](#aggregateOf) and [`aggregateN`](#aggregateN).
+-}
+aggregateOfN : (a -> Interval number units) -> List a -> Maybe (Interval number units)
+aggregateOfN getInterval items =
+    case items of
+        first :: rest ->
+            Just (aggregateOf getInterval first rest)
 
         [] ->
             Nothing
@@ -288,150 +513,173 @@ endpoints (Interval intervalEndpoints) =
 
 
 {-| Get the minimum value of an interval.
-
-    Interval.minValue <|
-        Interval.from
-            (Length.meters 1)
-            (Length.meters 3)
-    --> Length.meters 1
-
 -}
 minValue : Interval number units -> Quantity number units
-minValue interval =
-    Tuple.first (endpoints interval)
+minValue (Interval ( a, _ )) =
+    a
 
 
 {-| Get the maximum value of an interval.
-
-    Interval.maxValue <|
-        Interval.from
-            (Length.meters 1)
-            (Length.meters 3)
-    --> Length.meters 3
-
 -}
 maxValue : Interval number units -> Quantity number units
-maxValue interval =
-    Tuple.second (endpoints interval)
+maxValue (Interval ( _, b )) =
+    b
 
 
 {-| Get the midpoint of an interval.
 
     Interval.midpoint <|
         Interval.from
-            (Duration.seconds 1)
-            (Duration.seconds 4)
-    --> Duration.seconds 2.5
+            (Duration.hours 2)
+            (Duration.hours 3)
+    --> Duration.hours 2.5
 
 -}
 midpoint : Interval Float units -> Quantity Float units
-midpoint interval =
-    let
-        ( intervalMinValue, intervalMaxValue ) =
-            endpoints interval
-    in
-    Quantity.midpoint intervalMinValue intervalMaxValue
+midpoint (Interval ( Quantity a, Quantity b )) =
+    Quantity (a + 0.5 * (b - a))
 
 
-{-| Get the width of an interval. This will never be negative.
+{-| Get the width of an interval.
 
     Interval.width <|
         Interval.from
-            (Duration.seconds 1)
-            (Duration.seconds 4)
-    --> Duration.seconds 3
+            (Length.meters 1.2)
+            (Length.meters 1.35)
+    --> Length.centimeters 15
 
 -}
 width : Interval number units -> Quantity number units
-width interval =
-    let
-        ( intervalMinValue, intervalMaxValue ) =
-            endpoints interval
-    in
-    intervalMaxValue |> Quantity.minus intervalMinValue
+width (Interval ( Quantity a, Quantity b )) =
+    Quantity (b - a)
 
 
-{-| Interpolate between an interval's endpoints; a value of 0.0 corresponds to
-the minimum value of the interval, a value of 0.5 corresponds to its midpoint
-and a value of 1.0 corresponds to its maximum value. Values less than 0.0 or
-greater than 1.0 can be used to extrapolate.
+{-| Interpolate between an interval's endpoints based on a parameter value. A
+value of 0.0 corresponds to the minimum value of the interval, a value of 0.5
+corresponds to its midpoint and a value of 1.0 corresponds to its maximum value:
 
-    oneTurn =
-        Interval.from (Angle.degrees 0) (Angle.degrees 360)
+    lengthInterval =
+        Interval.from (Length.meters 1) (Length.meters 5)
 
-    Interval.interpolate oneTurn 0
-    --> Angle.degrees 0
+    Interval.interpolate lengthInterval 0
+    --> Length.meters 1
 
-    Interval.interpolate oneTurn 0.75
-    --> Angle.degrees 270
+    Interval.interpolate lengthInterval 0.75
+    --> Length.meters 4
 
-    Interval.interpolate oneTurn -0.5
-    --> Angle.degrees -180
+Values less than 0.0 or greater than 1.0 can be used to extrapolate:
 
-Note that the interpolation is in fact from the minimum value to the maximum,
-_not_ "from the first `Interval.from` argument to the second":
+    Interval.interpolate lengthInterval 1.5
+    --> Length.meters 7
+
+Note that because of how [`Interval.from`](#from) works, the interpolation is in
+fact from the minimum value to the maximum, _not_ "from the first
+`Interval.from` argument to the second":
 
     Interval.interpolate
         (Interval.from
-            (Angle.degrees 0)
-            (Angle.degrees 180)
+            (Length.meters 0)
+            (Length.meters 10)
         )
-        0.25
-    --> Angle.degrees 45
+        0.2
+    --> 2
 
     Interval.interpolate
         (Interval.from
-            (Angle.degrees 180)
-            (Angle.degrees 0)
+            (Length.meters 10)
+            (Length.meters 0)
         )
-        0.25
-    --> Angle.degrees 45 -- not 135!
+        0.2
+    --> 2 -- not 8!
+
+If you want to interpolate from one number down to another, you can use
+[`Quantity.interpolateFrom`](https://package.elm-lang.org/packages/ianmackenzie/elm-units/latest/Quantity#interpolateFrom)
+from the `elm-units` package.
 
 -}
 interpolate : Interval Float units -> Float -> Quantity Float units
-interpolate interval t =
-    let
-        ( intervalMinValue, intervalMaxValue ) =
-            endpoints interval
-    in
-    Quantity.interpolateFrom intervalMinValue intervalMaxValue t
+interpolate (Interval ( a, b )) t =
+    Quantity.interpolateFrom a b t
 
 
-{-| Check if an interval contains a given value.
+{-| Given an interval and a given value, determine the corresponding
+interpolation parameter (the parameter that you would pass to [`interpolate`](#interpolate)
+to get the given value):
 
-    durationInterval =
+    Interval.interpolationParameter
+        (Interval.from
+            (Duration.minutes 10)
+            (Duration.minutes 15)
+        )
+        (Duration.minutes 12)
+    --> 0.4
+
+The result will be between 0 and 1 if (and only if) the given value is contained
+in the given interval:
+
+    Interval.interpolationParameter
+        (Interval.from
+            (Duration.minutes 10)
+            (Duration.minutes 15)
+        )
+        (Duration.minutes 18)
+    --> 1.6
+
+    Interval.interpolationParameter
+        (Interval.from
+            (Duration.minutes 10)
+            (Duration.minutes 15)
+        )
+        (Duration.minutes 9)
+    --> -0.2
+
+This is the inverse of `interpolate`; for any non-zero-width `interval`,
+
+    Interval.interpolationParameter interval value
+        |> Interval.interpolate interval
+
+should be equal to the original `value` (within numerical roundoff).
+
+-}
+interpolationParameter : Interval Float units -> Quantity Float units -> Float
+interpolationParameter (Interval ( Quantity a, Quantity b )) (Quantity x) =
+    if a < b then
+        (x - a) / (b - a)
+
+    else if x < a then
+        -1 / 0
+
+    else if x > b then
+        1 / 0
+
+    else
+        -- value, a and intervalMaxValue are all equal
+        0
+
+
+{-| Check if an interval contains a given value:
+
+    angleInterval =
         Interval.from
-            (Duration.minutes 30)
-            (Duration.minutes 90)
+            (Angle.degrees -10)
+            (Angle.degrees 30)
 
-    durationInterval
-        |> Interval.contains
-            (Duration.hours 1)
+    angleInterval |> Interval.contains (Angle.degrees 0)
     --> True
 
-
-    durationInterval
-        |> Interval.contains
-            (Duration.hours 2)
+    angleInterval |> Interval.contains (Angle.degrees 45)
     --> False
 
 The minimum and maximum values of an interval are considered to be contained in
-the interval:
+the interval (but be careful of numerical roundoff):
 
-    durationInterval
-        |> Interval.contains
-            (Duration.hours 0.5)
+    angleInterval |> Interval.contains (Angle.degrees 30)
     --> True
 
 -}
 contains : Quantity number units -> Interval number units -> Bool
-contains value interval =
-    let
-        ( intervalMinValue, intervalMaxValue ) =
-            endpoints interval
-    in
-    (intervalMinValue |> Quantity.lessThanOrEqualTo value)
-        && (value |> Quantity.lessThanOrEqualTo intervalMaxValue)
+contains (Quantity x) (Interval ( Quantity a, Quantity b )) =
+    a <= x && x <= b
 
 
 {-| Check if two intervals touch or overlap (have any values in common).
@@ -471,16 +719,8 @@ intersection of two just-touching intervals):
 
 -}
 intersects : Interval number units -> Interval number units -> Bool
-intersects firstInterval secondInterval =
-    let
-        ( min1, max1 ) =
-            endpoints firstInterval
-
-        ( min2, max2 ) =
-            endpoints secondInterval
-    in
-    (min1 |> Quantity.lessThanOrEqualTo max2)
-        && (max1 |> Quantity.greaterThanOrEqualTo min2)
+intersects (Interval ( Quantity a1, Quantity b1 )) (Interval ( Quantity a2, Quantity b2 )) =
+    a1 <= b2 && b1 >= a2
 
 
 {-| Check if the second interval is fully contained in the first.
@@ -510,185 +750,192 @@ example would be written as:
 
 -}
 isContainedIn : Interval number units -> Interval number units -> Bool
-isContainedIn firstInterval secondInterval =
-    let
-        ( min1, max1 ) =
-            endpoints firstInterval
-
-        ( min2, max2 ) =
-            endpoints secondInterval
-    in
-    (min2 |> Quantity.greaterThanOrEqualTo min1)
-        && (max2 |> Quantity.lessThanOrEqualTo max1)
+isContainedIn (Interval ( Quantity a1, Quantity b1 )) (Interval ( Quantity a2, Quantity b2 )) =
+    a1 <= a2 && b2 <= b1
 
 
 {-| Check if the interval is a singleton (the minimum and maximum values are the
 same).
 
-    Interval.isSingleton
-        (Interval.from (Length.meters 2) (Length.meters 2))
+    Interval.isSingleton <|
+        Interval.from (Length.meters 2) (Length.meters 2)
     --> True
 
-    Interval.isSingleton
-        (Interval.from (Length.meters 2) (Length.meters 3))
+    Interval.isSingleton <|
+        Interval.from (Length.meters 2) (Length.meters 3)
     --> False
 
 -}
 isSingleton : Interval number units -> Bool
-isSingleton interval =
-    let
-        ( intervalMinValue, intervalMaxValue ) =
-            endpoints interval
-    in
-    intervalMinValue == intervalMaxValue
+isSingleton (Interval ( a, b )) =
+    a == b
 
 
-shiftBy : Quantity number units -> Interval number units -> Interval number units
-shiftBy delta interval =
-    let
-        ( intervalMinValue, intervalMaxValue ) =
-            endpoints interval
-    in
+{-| Negate an interval. Note that this will flip the order of the endpoints.
+
+    Interval.negate <|
+        Interval.from
+            (Angle.degrees 20)
+            (Angle.degrees 30)
+    --> Interval.from
+    -->     (Angle.degrees -30)
+    -->     (Angle.degrees -20)
+
+-}
+negate : Interval number units -> Interval number units
+negate (Interval ( Quantity a, Quantity b )) =
+    Interval ( Quantity -b, Quantity -a )
+
+
+{-| Add the given amount to an interval:
+
+    lengthInterval =
+        Interval.from
+            (Length.meters 2)
+            (Length.meters 3)
+
+    lengthInterval |> Interval.add (Length.centinmeters 20)
+    --> Interval.from
+    -->     (Length.meters 2.2)
+    -->     (Length.meters 3.2)
+
+-}
+add : Quantity number units -> Interval number units -> Interval number units
+add (Quantity delta) (Interval ( Quantity a, Quantity b )) =
     Interval
-        ( intervalMinValue |> Quantity.plus delta
-        , intervalMaxValue |> Quantity.plus delta
+        ( Quantity (a + delta)
+        , Quantity (b + delta)
         )
 
 
-{-| For a given range of angle values, find the corresponding range of sine
-values. Takes an `Interval` from this module and returns an `Interval` from the
-`elm-interval` package.
+{-| Subtract the given amount from an interval.
 
-    Quantity.Interval.sin <|
-        Quantity.Interval.from
-            (Angle.degrees 0)
-            (Angle.degrees 45)
-    --> Interval.from 0 0.7071
+    angleInterval =
+        Interval.from
+            (Angle.degrees -10)
+            (Angle.degrees 50)
 
-    Quantity.Interval.sin <|
-        Quantity.Interval.from
-            (Angle.degrees 0)
-            (Angle.degrees 180)
-    --> Interval.from 0 1
+    angleInterval |> Interval.subtract (Angle.degrees 30)
+    --> Interval.from
+    -->     (Angle.degrees -40)
+    -->     (Angle.degrees 20)
 
 -}
-sin : Interval Float Radians -> Interval.Interval Float
-sin interval =
-    if isSingleton interval then
-        Interval.singleton (Angle.sin (minValue interval))
+subtract : Quantity number units -> Interval number units -> Interval number units
+subtract (Quantity delta) (Interval ( Quantity a, Quantity b )) =
+    Interval ( Quantity (a - delta), Quantity (b - delta) )
+
+
+{-| Multiply an interval by a given value:
+
+    Interval.multiplyBy 5 <|
+        Interval.from
+            (Duration.minutes 20)
+            (Duration.minutes 30)
+    --> Interval.from
+    -->     (Duration.minutes 100)
+    -->     (Duration.minutes 150)
+
+Note that this will flip the order of the interval's endpoints if the given
+value is negative:
+
+    Interval.multiplyBy -2 <|
+        Interval.from
+            (Angle.degrees 20)
+            (Angle.degrees 30)
+    --> Interval.from
+    -->     (Angle.degrees -60)
+    -->     (Angle.degrees -40)
+
+-}
+multiplyBy : number -> Interval number units -> Interval number units
+multiplyBy scale (Interval ( Quantity a, Quantity b )) =
+    if scale >= 0 then
+        Interval ( Quantity (a * scale), Quantity (b * scale) )
 
     else
-        let
-            ( includesMin, includesMax ) =
-                sinIncludesMinMax interval
-
-            ( intervalMinValue, intervalMaxValue ) =
-                endpoints interval
-
-            newMin =
-                if includesMin then
-                    -1
-
-                else
-                    min (Angle.sin intervalMinValue)
-                        (Angle.sin intervalMaxValue)
-
-            newMax =
-                if includesMax then
-                    1
-
-                else
-                    max (Angle.sin intervalMinValue)
-                        (Angle.sin intervalMaxValue)
-        in
-        Interval.fromEndpoints ( newMin, newMax )
+        Interval ( Quantity (b * scale), Quantity (a * scale) )
 
 
-{-| For a given range of angle values, find the corresponding range of sine
-values. Takes an `Interval` from this module and returns an `Interval` from the
-`elm-interval` package.
+{-| Divide an interval by a given value:
 
-    Quantity.Interval.cos <|
-        Quantity.Interval.from
-            (Angle.degrees 0)
-            (Angle.degrees 45)
-    --> Interval.from 0.7071 1
+    Interval.divideBy 2 <|
+        Interval.from (Length.feet 2) (Length.feet 3)
+    --> Interval.from (Length.feet 1) (Length.feet 1.5)
 
-    Quantity.Interval.cos <|
-        Quantity.Interval.from
-            (Angle.degrees 0)
-            (Angle.degrees 180)
-    --> Interval.from -1 1
+Note that this will flip the order of the interval's endpoints if the given
+value is negative:
+
+    Interval.divideBy -2 <|
+        Interval.from
+            (Angle.degrees 20)
+            (Angle.degrees 30)
+    --> Interval.from
+    -->     (Angle.degrees -15)
+    -->     (Angle.degrees -10)
 
 -}
-cos : Interval Float Radians -> Interval.Interval Float
-cos interval =
-    if isSingleton interval then
-        Interval.singleton (Angle.cos (minValue interval))
+divideBy : Float -> Interval Float units -> Interval Float units
+divideBy divisor (Interval ( Quantity a, Quantity b )) =
+    if divisor == 0 then
+        Interval ( Quantity.negativeInfinity, Quantity.positiveInfinity )
+
+    else if divisor > 0 then
+        Interval ( Quantity (a / divisor), Quantity (b / divisor) )
 
     else
-        let
-            ( includesMin, includesMax ) =
-                cosIncludesMinMax interval
-
-            ( intervalMinValue, intervalMaxValue ) =
-                endpoints interval
-
-            newMin =
-                if includesMin then
-                    -1
-
-                else
-                    min (Angle.cos intervalMinValue)
-                        (Angle.cos intervalMaxValue)
-
-            newMax =
-                if includesMax then
-                    1
-
-                else
-                    max (Angle.cos intervalMinValue)
-                        (Angle.cos intervalMaxValue)
-        in
-        Interval.fromEndpoints ( newMin, newMax )
+        Interval ( Quantity (b / divisor), Quantity (a / divisor) )
 
 
-{-| cos(x - pi/2) = sin(x), therefore if cos(interval - pi/2) includes
-the maximum/minimum, that means sin(interval) includes the maximum/minimum
-accordingly.
+{-| Shorthand for `multiplyBy 0.5`.
 -}
-sinIncludesMinMax : Interval Float Radians -> ( Bool, Bool )
-sinIncludesMinMax interval =
-    interval |> shiftBy (Angle.radians (-pi / 2)) |> cosIncludesMinMax
+half : Interval Float units -> Interval Float units
+half (Interval ( Quantity a, Quantity b )) =
+    Interval ( Quantity (0.5 * a), Quantity (0.5 * b) )
 
 
-{-| cos(x + pi) = -cos(x), therefore if cos(interval + pi) includes the maximum,
-that means cos(interval) includes the minimum.
+{-| Shorthand for `multiplyBy 2`.
 -}
-cosIncludesMinMax : Interval Float Radians -> ( Bool, Bool )
-cosIncludesMinMax interval =
-    ( interval |> shiftBy (Angle.radians pi) |> cosIncludesMax
-    , interval |> cosIncludesMax
-    )
+twice : Interval number units -> Interval number units
+twice (Interval ( Quantity a, Quantity b )) =
+    Interval ( Quantity (2 * a), Quantity (2 * b) )
 
 
-{-| The maximum of cos(x) is x = 2 pi \* k for every integer k.
-If `minValue` and `maxValue` are in different branches
-(meaning diffrent values of k), then the interval must pass through
-2 pi \* k, which means the interval must include the maximum value.
+{-| Add two intervals together.
+
+    firstInterval =
+        Interval.from (Length.feet 5) (Length.feet 10)
+
+    secondInterval =
+        Interval.from (Length.feet 2) (Length.feet 3)
+
+    firstInterval |> Interval.plus secondInterval
+    --> Interval.from (Length.feet 7) (Length.feet 13)
+
 -}
-cosIncludesMax : Interval Float Radians -> Bool
-cosIncludesMax interval =
-    let
-        ( intervalMinValue, intervalMaxValue ) =
-            endpoints interval
+plus : Interval number units -> Interval number units -> Interval number units
+plus (Interval ( Quantity a2, Quantity b2 )) (Interval ( Quantity a1, Quantity b1 )) =
+    Interval ( Quantity (a2 + a1), Quantity (b2 + b1) )
 
-        minBranch =
-            floor <|
-                Quantity.ratio intervalMinValue (Angle.radians (2 * pi))
 
-        maxBranch =
-            floor <|
-                Quantity.ratio intervalMaxValue (Angle.radians (2 * pi))
-    in
-    minBranch /= maxBranch
+{-| Subtract the first interval from the second. This means that `minus` makes
+the most sense when using `|>`:
+
+    firstInterval =
+        Interval.from (Length.feet 5) (Length.feet 10)
+
+    secondInterval =
+        Interval.from (Length.feet 2) (Length.feet 3)
+
+    firstInterval |> Interval.minus secondInterval
+    --> Interval.from (Length.feet 2) (Length.feet 8)
+
+Without the pipe operator, the above would be written as:
+
+    Interval.minus secondInterval firstInterval
+    --> Interval.from 2 8
+
+-}
+minus : Interval number units -> Interval number units -> Interval number units
+minus (Interval ( Quantity a2, Quantity b2 )) (Interval ( Quantity a1, Quantity b1 )) =
+    Interval ( Quantity (a1 - b2), Quantity (b1 - a2) )

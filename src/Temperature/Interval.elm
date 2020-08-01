@@ -1,13 +1,18 @@
 module Temperature.Interval exposing
     ( Interval
-    , singleton, fromEndpoints, from, containingValues, aggregate, hull, intersection
+    , from, fromEndpoints, singleton
+    , union, intersection
+    , hull, hullN, hullOf, hullOfN
+    , aggregate, aggregateN, aggregateOf, aggregateOfN
     , endpoints, minValue, maxValue, midpoint, width
-    , contains, intersects, isContainedIn, isSingleton
-    , interpolate
+    , contains, isContainedIn, intersects, isSingleton
+    , interpolate, interpolationParameter
+    , add, subtract
+    , plus, minus
     )
 
-{-| This module behaves just like `Quantity.Interval`, but works on
-[`Temperature`](https://package.elm-lang.org/packages/ianmackenzie/elm-units/latest/Temperature)
+{-| This module behaves much like [`Quantity.Interval`](Quantity-Interval), but
+works on [`Temperature`](https://package.elm-lang.org/packages/ianmackenzie/elm-units/latest/Temperature)
 values.
 
 @docs Interval
@@ -15,7 +20,28 @@ values.
 
 # Constructors
 
-@docs singleton, fromEndpoints, from, containingValues, aggregate, hull, intersection
+@docs from, fromEndpoints, singleton
+
+
+## Booleans
+
+@docs union, intersection
+
+
+## Hull
+
+These functions let you construct an `Interval` containing one or more input
+temperatures.
+
+@docs hull, hullN, hullOf, hullOfN
+
+
+## Aggregation
+
+These functions let you 'aggregate' one or more temperature intervals into a
+single larger interval that contains all of them.
+
+@docs aggregate, aggregateN, aggregateOf, aggregateOfN
 
 
 # Properties
@@ -25,20 +51,30 @@ values.
 
 # Queries
 
-@docs contains, intersects, isContainedIn, isSingleton
+@docs contains, isContainedIn, intersects, isSingleton
 
 
 # Interpolation
 
-@docs interpolate
+@docs interpolate, interpolationParameter
+
+
+# Arithmetic
+
+@docs add, subtract
+
+The `plus` and `minus` functions both involve `Interval Float CelsiusDegrees`
+values, where `Interval` in this case refers to the type in the
+`Quantity.Interval` module. This represents an interval of [temperature deltas](Temperatur#Delta).
+
+@docs plus, minus
 
 -}
 
-import Angle exposing (Radians)
 import Float.Extra as Float
-import Interval
 import Quantity exposing (Quantity)
-import Temperature exposing (Temperature)
+import Quantity.Interval as Interval
+import Temperature exposing (CelsiusDegrees, Temperature)
 
 
 {-| Represents a finite, closed interval with a minimum and maximum temperature,
@@ -84,18 +120,100 @@ from firstValue secondValue =
         Interval ( secondValue, firstValue )
 
 
+{-| Construct an interval containing one or more input temperatures.
+-}
+hull : Temperature -> List Temperature -> Interval
+hull first rest =
+    hullHelp first first rest
+
+
+hullHelp : Temperature -> Temperature -> List Temperature -> Interval
+hullHelp low high remaining =
+    case remaining of
+        first :: rest ->
+            hullHelp
+                (Temperature.min first low)
+                (Temperature.max first high)
+                rest
+
+        [] ->
+            from low high
+
+
 {-| Construct an interval containing all temperatures in the given list. If the
 list is empty, returns `Nothing`.
 -}
-containingValues : List Temperature -> Maybe Interval
-containingValues values =
-    Maybe.map2 from (Temperature.minimum values) (Temperature.maximum values)
+hullN : List Temperature -> Maybe Interval
+hullN values =
+    case values of
+        first :: rest ->
+            Just (hull first rest)
+
+        [] ->
+            Nothing
+
+
+{-| Like [`hull`](#hull), but lets you work on any kind of item as long as a
+`Temperature` can be extracted from it:
+
+    type alias WeatherMeasurement =
+        { windSpeed : Speed
+        , temperature : Temperature
+        , barometricPressure : Pressure
+        }
+
+    temperatureRange =
+        Temperature.Interval.hullOf .temperature <|
+            measurement1
+            [ measurement2
+            , measurement3
+            , measurement4
+            ]
+
+-}
+hullOf : (a -> Temperature) -> a -> List a -> Interval
+hullOf getTemperature first rest =
+    let
+        firstTemperature =
+            getTemperature first
+    in
+    hullOfHelp firstTemperature firstTemperature getTemperature rest
+
+
+hullOfHelp : Temperature -> Temperature -> (a -> Temperature) -> List a -> Interval
+hullOfHelp low high getTemperature remaining =
+    case remaining of
+        first :: rest ->
+            let
+                temperature =
+                    getTemperature first
+            in
+            hullOfHelp
+                (Temperature.min temperature low)
+                (Temperature.max temperature high)
+                getTemperature
+                rest
+
+        [] ->
+            from low high
+
+
+{-| Combination of [`hullOf`](#hullOf) and [`hullN`](#hullN).
+-}
+hullOfN : (a -> Temperature) -> List a -> Maybe Interval
+hullOfN getTemperature items =
+    case items of
+        first :: rest ->
+            Just (hullOf getTemperature first rest)
+
+        [] ->
+            Nothing
 
 
 {-| Construct an interval containing both of the given intervals.
 -}
-hull : Interval -> Interval -> Interval
-hull firstInterval secondInterval =
+union : Interval -> Interval -> Interval
+union firstInterval secondInterval =
     let
         ( min1, max1 ) =
             endpoints firstInterval
@@ -132,14 +250,46 @@ intersection firstInterval secondInterval =
         Nothing
 
 
+{-| Construct an interval containing one or more given intervals.
+-}
+aggregate : Interval -> List Interval -> Interval
+aggregate first rest =
+    List.foldl union first rest
+
+
 {-| Construct an interval containing all of the intervals in the given list. If
 the list is empty, returns `Nothing`.
 -}
-aggregate : List Interval -> Maybe Interval
-aggregate intervals =
+aggregateN : List Interval -> Maybe Interval
+aggregateN intervals =
     case intervals of
         first :: rest ->
-            Just (List.foldl hull first rest)
+            Just (aggregate first rest)
+
+        [] ->
+            Nothing
+
+
+{-| Like [`aggregate`](#aggregate), but lets you work on any kind of item as
+long as a temperature interval can be generated from it (similar to [`hullOf`](#hullOf)).
+-}
+aggregateOf : (a -> Interval) -> a -> List a -> Interval
+aggregateOf getInterval first rest =
+    List.foldl
+        (\item accumulated ->
+            union accumulated (getInterval item)
+        )
+        (getInterval first)
+        rest
+
+
+{-| Combination of [`aggregateOf`](#aggregateOf) and [`aggregateN`](#aggregateN).
+-}
+aggregateOfN : (a -> Interval) -> List a -> Maybe Interval
+aggregateOfN getInterval items =
+    case items of
+        first :: rest ->
+            Just (aggregateOf getInterval first rest)
 
         [] ->
             Nothing
@@ -205,6 +355,28 @@ interpolate interval t =
             t
 
 
+{-| Given an interval and a given value, determine the corresponding
+interpolation parameter (the parameter that you would pass to [`interpolate`](#interpolate)
+to get the given value).
+-}
+interpolationParameter : Interval -> Temperature -> Float
+interpolationParameter (Interval ( low, high )) temperature =
+    if low |> Temperature.lessThan high then
+        Quantity.ratio
+            (temperature |> Temperature.minus low)
+            (high |> Temperature.minus low)
+
+    else if temperature |> Temperature.lessThan low then
+        -1 / 0
+
+    else if temperature |> Temperature.greaterThan high then
+        1 / 0
+
+    else
+        -- temperature, low and high are all equal
+        0
+
+
 {-| Check if an interval contains a given temperature. The minimum and maximum
 temperatures of the interval are considered to be contained in the interval.
 -}
@@ -259,3 +431,75 @@ isSingleton interval =
             endpoints interval
     in
     intervalMinValue == intervalMaxValue
+
+
+{-| Add a [temperature delta](Temperature#Delta) to a temperature interval.
+-}
+add : Temperature.Delta -> Interval -> Interval
+add delta (Interval ( low, high )) =
+    Interval
+        ( low |> Temperature.plus delta
+        , high |> Temperature.plus delta
+        )
+
+
+{-| Subtract a [temperature delta](Temperature#Delta) from a temperature
+interval.
+-}
+subtract : Temperature.Delta -> Interval -> Interval
+subtract delta interval =
+    add (Quantity.negate delta) interval
+
+
+{-| Add a temperature delta interval to a temperature interval to give a new
+temperature interval:
+
+    temperatureInterval =
+        Temperature.Interval.from
+            (Temperature.degreesCelsius 20)
+            (Temperature.degreesCelsius 25)
+
+    deltaInterval =
+        Quantity.Interval.from
+            (Temperature.celsiusDegrees -1)
+            (Temperature.celsiusDegrees 4)
+
+    temperatureInterval
+        |> Temperature.Interval.plus deltaInterval
+    --> Temperature.Interval.from
+    -->     (Temperature.degreesCelsius 19)
+    -->     (Temperature.degreesCelsius 29)
+
+-}
+plus : Interval.Interval Float CelsiusDegrees -> Interval -> Interval
+plus delta (Interval ( low, high )) =
+    from
+        (low |> Temperature.plus (Interval.minValue delta))
+        (high |> Temperature.plus (Interval.maxValue delta))
+
+
+{-| Subtract the first given temperature interval from the second, resulting in
+a temperature delta interval:
+
+    firstInterval =
+        Temperature.Interval.from
+            (Temperature.degreesCelsius 5)
+            (Temperature.degreesCelsius 10)
+
+    secondInterval =
+        Temperature.Interval.from
+            (Temperature.degreesCelsius 30)
+            (Temperature.degreesCelsius 40)
+
+    secondInterval
+        |> Temperature.Interval.minus firstInterval
+    --> Quantity.Interval.from
+    -->     (Temperature.celsiusDegrees 20)
+    -->     (Temperature.celsiusDegrees 35)
+
+-}
+minus : Interval -> Interval -> Interval.Interval Float CelsiusDegrees
+minus (Interval ( a2, b2 )) (Interval ( a1, b1 )) =
+    Interval.from
+        (a1 |> Temperature.minus b2)
+        (b1 |> Temperature.minus a2)
