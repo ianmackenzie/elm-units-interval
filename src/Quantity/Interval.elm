@@ -9,6 +9,7 @@ module Quantity.Interval exposing
     , interpolate, interpolationParameter
     , negate, add, subtract, multiplyBy, divideBy, half, twice
     , plus, minus
+    , randomValue
     )
 
 {-| This modules contains most of the core functionality for creating and
@@ -70,9 +71,15 @@ These functions let you do math with `Interval` values, following the rules of
 @docs negate, add, subtract, multiplyBy, divideBy, half, twice
 @docs plus, minus
 
+
+# Random value generation
+
+@docs randomValue
+
 -}
 
 import Quantity exposing (Quantity(..))
+import Random exposing (Generator)
 
 
 {-| Represents a finite, closed interval with a minimum and maximum value.
@@ -939,3 +946,17 @@ Without the pipe operator, the above would be written as:
 minus : Interval number units -> Interval number units -> Interval number units
 minus (Interval ( Quantity a2, Quantity b2 )) (Interval ( Quantity a1, Quantity b1 )) =
     Interval ( Quantity (a1 - b2), Quantity (b1 - a2) )
+
+
+{-| Create a [random generator](https://package.elm-lang.org/packages/elm/random/latest/Random)
+for quantities within a given interval. For example,
+
+    Interval.randomValue <|
+        Interval.from (Length.meters 5) (Length.meters 10)
+
+is a `Generator` that will produce random lengths between 5 and 10 meters.
+
+-}
+randomValue : Interval Float units -> Generator (Quantity Float units)
+randomValue (Interval ( Quantity a, Quantity b )) =
+    Random.map Quantity (Random.float a b)
