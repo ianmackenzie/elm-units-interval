@@ -8,7 +8,7 @@ module Quantity.Interval exposing
     , contains, isContainedIn, intersects, isSingleton
     , interpolate, interpolationParameter
     , negate, add, subtract, multiplyBy, divideBy, half, twice
-    , plus, minus
+    , plus, minus, times
     , randomValue
     )
 
@@ -69,7 +69,7 @@ These functions let you do math with `Interval` values, following the rules of
 [interval arithmetic](https://en.wikipedia.org/wiki/Interval_arithmetic).
 
 @docs negate, add, subtract, multiplyBy, divideBy, half, twice
-@docs plus, minus
+@docs plus, minus, times
 
 
 # Random value generation
@@ -78,7 +78,7 @@ These functions let you do math with `Interval` values, following the rules of
 
 -}
 
-import Quantity exposing (Quantity(..))
+import Quantity exposing (Product, Quantity(..))
 import Random exposing (Generator)
 
 
@@ -946,6 +946,44 @@ Without the pipe operator, the above would be written as:
 minus : Interval number units -> Interval number units -> Interval number units
 minus (Interval ( Quantity a2, Quantity b2 )) (Interval ( Quantity a1, Quantity b1 )) =
     Interval ( Quantity (a1 - b2), Quantity (b1 - a2) )
+
+
+{-| Multiply the second interval by the first. The order only matters if the
+two intervals have different units (since it will affect the units of the
+result) but, like other functions in this module, `times` is generally designed
+to be used with `|>`:
+
+    width =
+        Interval.from (Length.centimeters 10) (Length.centimeters 12)
+
+    height =
+        Interval.from (Length.centimeters 5) (Length.centimeters 6)
+
+    width |> Interval.times height
+    --> Interval.from
+    -->     (Area.squareCentimeters 50)
+    -->     (Area.squareCentimeters 72)
+
+-}
+times : Interval number units2 -> Interval number units1 -> Interval number (Product units1 units2)
+times (Interval ( Quantity a2, Quantity b2 )) (Interval ( Quantity a1, Quantity b1 )) =
+    let
+        aa =
+            a1 * a2
+
+        ab =
+            a1 * b2
+
+        ba =
+            b1 * a2
+
+        bb =
+            b1 * b2
+    in
+    Interval
+        ( Quantity (min (min (min aa ab) ba) bb)
+        , Quantity (max (max (max aa ab) ba) bb)
+        )
 
 
 {-| Create a [random generator](https://package.elm-lang.org/packages/elm/random/latest/Random)

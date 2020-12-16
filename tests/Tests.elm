@@ -14,6 +14,7 @@ module Tests exposing
     , plus
     , sinWorksProperly
     , subtract
+    , times
     , union
     )
 
@@ -45,7 +46,7 @@ angleIntervalFuzzer =
     Fuzz.map2 Interval.from endpoint endpoint
 
 
-endpointsString : Interval Float Unitless -> String
+endpointsString : Interval Float units -> String
 endpointsString interval =
     let
         ( minValue, maxValue ) =
@@ -53,21 +54,21 @@ endpointsString interval =
     in
     String.concat
         [ "["
-        , String.fromFloat (Quantity.toFloat minValue)
+        , String.fromFloat (Quantity.unwrap minValue)
         , ","
-        , String.fromFloat (Quantity.toFloat maxValue)
+        , String.fromFloat (Quantity.unwrap maxValue)
         , "]"
         ]
 
 
-expectValueIn : Interval Float Unitless -> Quantity Float Unitless -> Expectation
+expectValueIn : Interval Float units -> Quantity Float units -> Expectation
 expectValueIn interval value =
     let
         ( low, high ) =
             Interval.endpoints interval
 
         tolerance =
-            Quantity.float 1.0e-12
+            Quantity.unsafe 1.0e-12
     in
     if
         (value |> Quantity.greaterThanOrEqualTo (low |> Quantity.minus tolerance))
@@ -77,7 +78,7 @@ expectValueIn interval value =
 
     else
         Expect.fail
-            (String.fromFloat (Quantity.toFloat value)
+            (String.fromFloat (Quantity.unwrap value)
                 ++ " is not contained in the interval "
                 ++ endpointsString interval
             )
@@ -302,8 +303,8 @@ testQuantityOperation description quantityFunction intervalFunction =
 
 testBinaryOperation :
     String
-    -> (Quantity Float Unitless -> Quantity Float Unitless -> Quantity Float Unitless)
-    -> (Interval Float Unitless -> Interval Float Unitless -> Interval Float Unitless)
+    -> (Quantity Float Unitless -> Quantity Float Unitless -> Quantity Float resultUnits)
+    -> (Interval Float Unitless -> Interval Float Unitless -> Interval Float resultUnits)
     -> Test
 testBinaryOperation description quantityFunction intervalFunction =
     Test.fuzz2
@@ -358,6 +359,11 @@ plus =
 minus : Test
 minus =
     testBinaryOperation "minus" Quantity.minus Interval.minus
+
+
+times : Test
+times =
+    testBinaryOperation "times" Quantity.times Interval.times
 
 
 interpolationParameter : Test
