@@ -1,8 +1,10 @@
 module Tests exposing
-    ( add
+    ( abs
+    , add
     , aggregate3
     , aggregateN
     , cosWorksProperly
+    , cubed
     , divideBy
     , hull3
     , hullN
@@ -13,6 +15,7 @@ module Tests exposing
     , multiplyBy
     , plus
     , sinWorksProperly
+    , squared
     , subtract
     , times
     , union
@@ -301,6 +304,25 @@ testQuantityOperation description quantityFunction intervalFunction =
         )
 
 
+testUnaryOperation :
+    String
+    -> (Quantity Float Unitless -> Quantity Float resultUnits)
+    -> (Interval Float Unitless -> Interval Float resultUnits)
+    -> Test
+testUnaryOperation description quantityFunction intervalFunction =
+    Test.fuzz2
+        intervalFuzzer
+        (Fuzz.floatRange 0 1)
+        description
+        (\interval u ->
+            let
+                value =
+                    Interval.interpolate interval u
+            in
+            quantityFunction value |> expectValueIn (intervalFunction interval)
+        )
+
+
 testBinaryOperation :
     String
     -> (Quantity Float Unitless -> Quantity Float Unitless -> Quantity Float resultUnits)
@@ -364,6 +386,21 @@ minus =
 times : Test
 times =
     testBinaryOperation "times" Quantity.times Interval.times
+
+
+abs : Test
+abs =
+    testUnaryOperation "abs" Quantity.abs Interval.abs
+
+
+squared : Test
+squared =
+    testUnaryOperation "squared" Quantity.squared Interval.squared
+
+
+cubed : Test
+cubed =
+    testUnaryOperation "cubed" Quantity.cubed Interval.cubed
 
 
 interpolationParameter : Test

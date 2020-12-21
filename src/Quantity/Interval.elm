@@ -8,7 +8,7 @@ module Quantity.Interval exposing
     , contains, isContainedIn, intersects, isSingleton
     , interpolate, interpolationParameter
     , negate, add, subtract, multiplyBy, divideBy, half, twice
-    , plus, minus, times
+    , plus, minus, times, abs, squared, cubed
     , randomValue
     )
 
@@ -69,7 +69,7 @@ These functions let you do math with `Interval` values, following the rules of
 [interval arithmetic](https://en.wikipedia.org/wiki/Interval_arithmetic).
 
 @docs negate, add, subtract, multiplyBy, divideBy, half, twice
-@docs plus, minus, times
+@docs plus, minus, times, abs, squared, cubed
 
 
 # Random value generation
@@ -78,7 +78,7 @@ These functions let you do math with `Interval` values, following the rules of
 
 -}
 
-import Quantity exposing (Product, Quantity(..))
+import Quantity exposing (Cubed, Product, Quantity(..), Squared)
 import Random exposing (Generator)
 
 
@@ -984,6 +984,63 @@ times (Interval ( Quantity a2, Quantity b2 )) (Interval ( Quantity a1, Quantity 
         ( Quantity (min (min (min aa ab) ba) bb)
         , Quantity (max (max (max aa ab) ba) bb)
         )
+
+
+{-| Get the absolute value of an interval.
+
+    Interval.abs <|
+        Interval.from
+            (Length.meters -3)
+            (Length.meters 2)
+    --> Interval.from (Length.meters 0) (Length.meters 3)
+
+-}
+abs : Interval number units -> Interval number units
+abs interval =
+    let
+        (Interval ( Quantity a, Quantity b )) =
+            interval
+    in
+    if a >= 0 then
+        interval
+
+    else if b <= 0 then
+        negate interval
+
+    else
+        Interval ( Quantity.zero, Quantity (max -a b) )
+
+
+{-| Get the square of an interval.
+-}
+squared : Interval number units -> Interval number (Squared units)
+squared interval =
+    let
+        (Interval ( Quantity a, Quantity b )) =
+            interval
+    in
+    if a >= 0 then
+        Interval ( Quantity (a * a), Quantity (b * b) )
+
+    else if b <= 0 then
+        Interval ( Quantity (b * b), Quantity (a * a) )
+
+    else if -a < b then
+        Interval ( Quantity.zero, Quantity (b * b) )
+
+    else
+        Interval ( Quantity.zero, Quantity (a * a) )
+
+
+{-| Get the cube of an interval.
+-}
+cubed : Interval number units -> Interval number (Cubed units)
+cubed interval =
+    let
+        (Interval ( Quantity a, Quantity b )) =
+            interval
+    in
+    Interval ( Quantity (a * a * a), Quantity (b * b * b) )
 
 
 {-| Create a [random generator](https://package.elm-lang.org/packages/elm/random/latest/Random)
