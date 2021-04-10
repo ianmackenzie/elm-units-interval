@@ -8,11 +8,7 @@ module Angle.Interval exposing (sin, cos)
 
 import Angle exposing (Radians)
 import Quantity exposing (Quantity(..), Unitless)
-import Quantity.Interval as Interval
-
-
-type alias Interval =
-    Interval.Interval Float Radians
+import Quantity.Interval as Interval exposing (Interval)
 
 
 {-| For a given range of angle values θ, determine the possible range of values
@@ -27,7 +23,7 @@ of sin(θ).
     --> Interval.from Quantity.zero (Quantity.float 1)
 
 -}
-sin : Interval -> Interval.Interval Float Unitless
+sin : Interval Float Radians -> Interval Float Unitless
 sin interval =
     if Interval.isSingleton interval then
         Interval.singleton (Quantity.float (Angle.sin (Interval.minValue interval)))
@@ -73,7 +69,7 @@ of cos(θ).
     -->     (Quantity.float 1)
 
 -}
-cos : Interval -> Interval.Interval Float Unitless
+cos : Interval Float Radians -> Interval Float Unitless
 cos interval =
     if Interval.isSingleton interval then
         Interval.singleton (Quantity.float (Angle.cos (Interval.minValue interval)))
@@ -107,7 +103,7 @@ cos interval =
 the maximum/minimum, that means sin(interval) includes the maximum/minimum
 accordingly.
 -}
-sinIncludesMinMax : Interval -> ( Bool, Bool )
+sinIncludesMinMax : Interval Float Radians -> ( Bool, Bool )
 sinIncludesMinMax interval =
     interval |> Interval.subtract (Angle.radians (pi / 2)) |> cosIncludesMinMax
 
@@ -115,7 +111,7 @@ sinIncludesMinMax interval =
 {-| cos(x + pi) = -cos(x), therefore if cos(interval + pi) includes the maximum,
 that means cos(interval) includes the minimum.
 -}
-cosIncludesMinMax : Interval -> ( Bool, Bool )
+cosIncludesMinMax : Interval Float Radians -> ( Bool, Bool )
 cosIncludesMinMax interval =
     ( interval |> Interval.add (Angle.radians pi) |> cosIncludesMax
     , interval |> cosIncludesMax
@@ -127,7 +123,7 @@ If `minValue` and `maxValue` are in different branches
 (meaning diffrent values of k), then the interval must pass through
 2 pi \* k, which means the interval must include the maximum value.
 -}
-cosIncludesMax : Interval -> Bool
+cosIncludesMax : Interval Float Radians -> Bool
 cosIncludesMax interval =
     let
         ( a, b ) =
