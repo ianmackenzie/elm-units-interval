@@ -7,8 +7,8 @@ module Temperature.Interval exposing
     , endpoints, minValue, maxValue, midpoint, width
     , contains, isContainedIn, intersects, isSingleton
     , interpolate, interpolationParameter
-    , add, subtract
     , plus, minus
+    , plusInterval, minusInterval
     )
 
 {-| This module behaves much like [`Quantity.Interval`](Quantity-Interval), but
@@ -61,13 +61,13 @@ single larger interval that contains all of them.
 
 # Arithmetic
 
-@docs add, subtract
+@docs plus, minus
 
-The `plus` and `minus` functions both involve `Interval Float CelsiusDegrees`
-values, where `Interval` in this case refers to the type in the
+The `plusInterval` and `minusInterval` functions both involve `Interval Float
+CelsiusDegrees` values, where `Interval` in this case refers to the type in the
 `Quantity.Interval` module. This represents an interval of [temperature deltas](Temperatur#Delta).
 
-@docs plus, minus
+@docs plusInterval, minusInterval
 
 -}
 
@@ -433,22 +433,55 @@ isSingleton interval =
     intervalMinValue == intervalMaxValue
 
 
-{-| Add a [temperature delta](Temperature#Delta) to a temperature interval.
+{-| Add a [temperature delta](Temperature#Delta) to a temperature interval,
+resulting in a new temperature interval.
+
+    temperatureInterval =
+        Temperature.Interval.from
+            (Temperature.degreesCelsius 20)
+            (Temperature.degreesCelsius 25)
+
+    temperatureInterval
+        |> Temperature.Interval.plus
+            (Temperature.celsiusDegrees 10)
+    --> Temperature.Interval.from
+    -->     (Temperature.degreesCelsius 30)
+    -->     (Temperature.degreesCelsius 35)
+
 -}
-add : Temperature.Delta -> Interval -> Interval
-add delta (Interval ( low, high )) =
+plus : Temperature.Delta -> Interval -> Interval
+plus delta (Interval ( low, high )) =
     Interval
         ( low |> Temperature.plus delta
         , high |> Temperature.plus delta
         )
 
 
-{-| Subtract a [temperature delta](Temperature#Delta) from a temperature
-interval.
+{-| Subtract a temperature value from a temperature interval to give an interval
+of temperature deltas.
+
+    temperatureInterval =
+        Temperature.Interval.from
+            (Temperature.degreesCelsius 20)
+            (Temperature.degreesCelsius 25)
+
+    temperatureInterval
+        |> Temperature.Interval.minus
+            (Temperature.degreesCelsius 15)
+    --> Quantity.Interval.from
+    -->     (Temperature.celsiusDegrees 5)
+    -->     (Temperature.celsiusDegrees 10)
+
 -}
-subtract : Temperature.Delta -> Interval -> Interval
-subtract delta interval =
-    add (Quantity.negate delta) interval
+minus : Temperature -> Interval -> Interval.Interval Float CelsiusDegrees
+minus temperature interval =
+    let
+        (Interval ( low, high )) =
+            interval
+    in
+    Interval.from
+        (low |> Temperature.minus temperature)
+        (high |> Temperature.minus temperature)
 
 
 {-| Add a temperature delta interval to a temperature interval to give a new
@@ -471,8 +504,8 @@ temperature interval:
     -->     (Temperature.degreesCelsius 29)
 
 -}
-plus : Interval.Interval Float CelsiusDegrees -> Interval -> Interval
-plus delta (Interval ( low, high )) =
+plusInterval : Interval.Interval Float CelsiusDegrees -> Interval -> Interval
+plusInterval delta (Interval ( low, high )) =
     from
         (low |> Temperature.plus (Interval.minValue delta))
         (high |> Temperature.plus (Interval.maxValue delta))
@@ -498,8 +531,8 @@ a temperature delta interval:
     -->     (Temperature.celsiusDegrees 35)
 
 -}
-minus : Interval -> Interval -> Interval.Interval Float CelsiusDegrees
-minus (Interval ( a2, b2 )) (Interval ( a1, b1 )) =
+minusInterval : Interval -> Interval -> Interval.Interval Float CelsiusDegrees
+minusInterval (Interval ( a2, b2 )) (Interval ( a1, b1 )) =
     Interval.from
         (a1 |> Temperature.minus b2)
         (b1 |> Temperature.minus a2)

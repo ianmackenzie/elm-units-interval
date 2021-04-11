@@ -105,7 +105,7 @@ accordingly.
 -}
 sinIncludesMinMax : Interval Float Radians -> ( Bool, Bool )
 sinIncludesMinMax interval =
-    interval |> Interval.subtract (Angle.radians (pi / 2)) |> cosIncludesMinMax
+    interval |> Interval.minus (Angle.radians (pi / 2)) |> cosIncludesMinMax
 
 
 {-| cos(x + pi) = -cos(x), therefore if cos(interval + pi) includes the maximum,
@@ -113,7 +113,7 @@ that means cos(interval) includes the minimum.
 -}
 cosIncludesMinMax : Interval Float Radians -> ( Bool, Bool )
 cosIncludesMinMax interval =
-    ( interval |> Interval.add (Angle.radians pi) |> cosIncludesMax
+    ( interval |> Interval.plus (Angle.radians pi) |> cosIncludesMax
     , interval |> cosIncludesMax
     )
 

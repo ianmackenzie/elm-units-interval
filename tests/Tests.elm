@@ -1,10 +1,10 @@
 module Tests exposing
     ( abs
-    , add
     , aggregate3
     , aggregateN
     , cosWorksProperly
     , cubed
+    , difference
     , divideBy
     , hull3
     , hullN
@@ -12,12 +12,17 @@ module Tests exposing
     , intersection
     , intersectsAndIntersectionAreConsistent
     , minus
+    , minusInterval
     , multiplyBy
     , plus
+    , plusInterval
+    , product
     , sinWorksProperly
     , squared
-    , subtract
     , times
+    , timesInterval
+    , timesUnitless
+    , timesUnitlessInterval
     , union
     )
 
@@ -284,8 +289,8 @@ testScalarOperation description scalarFuzzer scalarFunction intervalFunction =
 
 testQuantityOperation :
     String
-    -> (Quantity Float Unitless -> Quantity Float Unitless -> Quantity Float Unitless)
-    -> (Quantity Float Unitless -> Interval Float Unitless -> Interval Float Unitless)
+    -> (Quantity Float Unitless -> Quantity Float Unitless -> Quantity Float resultUnits)
+    -> (Quantity Float Unitless -> Interval Float Unitless -> Interval Float resultUnits)
     -> Test
 testQuantityOperation description quantityFunction intervalFunction =
     Test.fuzz3
@@ -347,14 +352,19 @@ testBinaryOperation description quantityFunction intervalFunction =
         )
 
 
-add : Test
-add =
-    testQuantityOperation "add" Quantity.plus Interval.add
+plus : Test
+plus =
+    testQuantityOperation "plus" Quantity.plus Interval.plus
 
 
-subtract : Test
-subtract =
-    testQuantityOperation "subtract" Quantity.minus Interval.subtract
+minus : Test
+minus =
+    testQuantityOperation "minus" Quantity.minus Interval.minus
+
+
+difference : Test
+difference =
+    testQuantityOperation "difference" (\a b -> a |> Quantity.minus b) Interval.difference
 
 
 multiplyBy : Test
@@ -373,19 +383,39 @@ divideBy =
         Interval.divideBy
 
 
-plus : Test
-plus =
-    testBinaryOperation "plus" Quantity.plus Interval.plus
+plusInterval : Test
+plusInterval =
+    testBinaryOperation "plusInterval" Quantity.plus Interval.plusInterval
 
 
-minus : Test
-minus =
-    testBinaryOperation "minus" Quantity.minus Interval.minus
+minusInterval : Test
+minusInterval =
+    testBinaryOperation "minusInterval" Quantity.minus Interval.minusInterval
 
 
 times : Test
 times =
-    testBinaryOperation "times" Quantity.times Interval.times
+    testQuantityOperation "times" Quantity.times Interval.times
+
+
+timesUnitless : Test
+timesUnitless =
+    testQuantityOperation "timesUnitless" Quantity.timesUnitless Interval.timesUnitless
+
+
+product : Test
+product =
+    testQuantityOperation "product" Quantity.times Interval.product
+
+
+timesInterval : Test
+timesInterval =
+    testBinaryOperation "timesInterval" Quantity.times Interval.timesInterval
+
+
+timesUnitlessInterval : Test
+timesUnitlessInterval =
+    testBinaryOperation "timesUnitlessInterval" Quantity.timesUnitless Interval.timesUnitlessInterval
 
 
 abs : Test

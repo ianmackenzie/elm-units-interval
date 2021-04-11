@@ -7,8 +7,10 @@ module Quantity.Interval exposing
     , endpoints, minValue, maxValue, midpoint, width
     , contains, isContainedIn, intersects, isSingleton
     , interpolate, interpolationParameter
-    , negate, add, subtract, multiplyBy, divideBy, half, twice
-    , plus, minus, times, abs, squared, cubed
+    , negate, multiplyBy, divideBy, half, twice
+    , plus, plusInterval, minus, difference, minusInterval
+    , times, product, timesUnitless, timesInterval, timesUnitlessInterval
+    , abs, squared, cubed
     , randomValue
     )
 
@@ -68,8 +70,10 @@ interval that contains all of them.
 These functions let you do math with `Interval` values, following the rules of
 [interval arithmetic](https://en.wikipedia.org/wiki/Interval_arithmetic).
 
-@docs negate, add, subtract, multiplyBy, divideBy, half, twice
-@docs plus, minus, times, abs, squared, cubed
+@docs negate, multiplyBy, divideBy, half, twice
+@docs plus, plusInterval, minus, difference, minusInterval
+@docs times, product, timesUnitless, timesInterval, timesUnitlessInterval
+@docs abs, squared, cubed
 
 
 # Random value generation
@@ -78,7 +82,7 @@ These functions let you do math with `Interval` values, following the rules of
 
 -}
 
-import Quantity exposing (Cubed, Product, Quantity(..), Squared)
+import Quantity exposing (Cubed, Product, Quantity(..), Squared, Unitless)
 import Random exposing (Generator)
 
 
@@ -801,14 +805,14 @@ negate (Interval ( Quantity a, Quantity b )) =
             (Length.meters 2)
             (Length.meters 3)
 
-    lengthInterval |> Interval.add (Length.centinmeters 20)
+    lengthInterval |> Interval.plus (Length.centinmeters 20)
     --> Interval.from
     -->     (Length.meters 2.2)
     -->     (Length.meters 3.2)
 
 -}
-add : Quantity number units -> Interval number units -> Interval number units
-add (Quantity delta) (Interval ( Quantity a, Quantity b )) =
+plus : Quantity number units -> Interval number units -> Interval number units
+plus (Quantity delta) (Interval ( Quantity a, Quantity b )) =
     Interval
         ( Quantity (a + delta)
         , Quantity (b + delta)
@@ -822,15 +826,37 @@ add (Quantity delta) (Interval ( Quantity a, Quantity b )) =
             (Angle.degrees -10)
             (Angle.degrees 50)
 
-    angleInterval |> Interval.subtract (Angle.degrees 30)
+    angleInterval |> Interval.minus (Angle.degrees 30)
     --> Interval.from
     -->     (Angle.degrees -40)
     -->     (Angle.degrees 20)
 
 -}
-subtract : Quantity number units -> Interval number units -> Interval number units
-subtract (Quantity delta) (Interval ( Quantity a, Quantity b )) =
+minus : Quantity number units -> Interval number units -> Interval number units
+minus (Quantity delta) (Interval ( Quantity a, Quantity b )) =
     Interval ( Quantity (a - delta), Quantity (b - delta) )
+
+
+{-| Subtract an interval from the given amount. So if you wanted to compute
+`interval - quantity` you would write
+
+    interval |> Interval.minus quantity
+
+but if you wanted to compute `quantity - interval` then you would write
+
+    Interval.difference quantity interval
+
+-}
+difference : Quantity number units -> Interval number units -> Interval number units
+difference quantity interval =
+    let
+        (Quantity x) =
+            quantity
+
+        (Interval ( Quantity a, Quantity b )) =
+            interval
+    in
+    Interval ( Quantity (x - b), Quantity (x - a) )
 
 
 {-| Multiply an interval by a given value:
@@ -920,13 +946,13 @@ twice (Interval ( Quantity a, Quantity b )) =
     --> Interval.from (Length.feet 7) (Length.feet 13)
 
 -}
-plus : Interval number units -> Interval number units -> Interval number units
-plus (Interval ( Quantity a2, Quantity b2 )) (Interval ( Quantity a1, Quantity b1 )) =
+plusInterval : Interval number units -> Interval number units -> Interval number units
+plusInterval (Interval ( Quantity a2, Quantity b2 )) (Interval ( Quantity a1, Quantity b1 )) =
     Interval ( Quantity (a2 + a1), Quantity (b2 + b1) )
 
 
-{-| Subtract the first interval from the second. This means that `minus` makes
-the most sense when using `|>`:
+{-| Subtract the first interval from the second. This means that `minusInterval`
+makes the most sense when using `|>`:
 
     firstInterval =
         Interval.from (Length.feet 5) (Length.feet 10)
@@ -934,18 +960,83 @@ the most sense when using `|>`:
     secondInterval =
         Interval.from (Length.feet 2) (Length.feet 3)
 
-    firstInterval |> Interval.minus secondInterval
+    firstInterval |> Interval.minusInterval secondInterval
     --> Interval.from (Length.feet 2) (Length.feet 8)
 
 Without the pipe operator, the above would be written as:
 
-    Interval.minus secondInterval firstInterval
+    Interval.minusInterval secondInterval firstInterval
     --> Interval.from 2 8
 
 -}
-minus : Interval number units -> Interval number units -> Interval number units
-minus (Interval ( Quantity a2, Quantity b2 )) (Interval ( Quantity a1, Quantity b1 )) =
+minusInterval : Interval number units -> Interval number units -> Interval number units
+minusInterval (Interval ( Quantity a2, Quantity b2 )) (Interval ( Quantity a1, Quantity b1 )) =
     Interval ( Quantity (a1 - b2), Quantity (b1 - a2) )
+
+
+{-| Multiply an `Interval` by a `Quantity`, for example
+
+    interval |> Interval.times quantity
+
+-}
+times : Quantity number quantityUnits -> Interval number intervalUnits -> Interval number (Product intervalUnits quantityUnits)
+times quantity interval =
+    let
+        (Quantity x) =
+            quantity
+
+        (Interval ( Quantity a, Quantity b )) =
+            interval
+    in
+    if x >= 0 then
+        Interval ( Quantity (a * x), Quantity (b * x) )
+
+    else
+        Interval ( Quantity (b * x), Quantity (a * x) )
+
+
+{-| Multiply an `Interval` by a `Quantity`, for example
+
+    Interval.product quantity interval
+
+Note that unlike [`times`](#times), the units of the result will be `Product
+quantityUnits intervalUnits`, not `Product intervalUnits quantityUnits`.
+
+-}
+product : Quantity number quantityUnits -> Interval number intervalUnits -> Interval number (Product quantityUnits intervalUnits)
+product quantity interval =
+    let
+        (Quantity x) =
+            quantity
+
+        (Interval ( Quantity a, Quantity b )) =
+            interval
+    in
+    if x >= 0 then
+        Interval ( Quantity (a * x), Quantity (b * x) )
+
+    else
+        Interval ( Quantity (b * x), Quantity (a * x) )
+
+
+{-| Multiply an `Interval` by a unitless `Quantity`. See the documentation for
+[`Quantity.timesUnitless`](https://package.elm-lang.org/packages/ianmackenzie/elm-units/latest/Quantity#timesUnitless)
+more details.
+-}
+timesUnitless : Quantity number Unitless -> Interval number units -> Interval number units
+timesUnitless quantity interval =
+    let
+        (Quantity x) =
+            quantity
+
+        (Interval ( Quantity a, Quantity b )) =
+            interval
+    in
+    if x >= 0 then
+        Interval ( Quantity (a * x), Quantity (b * x) )
+
+    else
+        Interval ( Quantity (b * x), Quantity (a * x) )
 
 
 {-| Multiply the second interval by the first. The order only matters if the
@@ -965,9 +1056,39 @@ to be used with `|>`:
     -->     (Area.squareCentimeters 72)
 
 -}
-times : Interval number units2 -> Interval number units1 -> Interval number (Product units1 units2)
-times (Interval ( Quantity a2, Quantity b2 )) (Interval ( Quantity a1, Quantity b1 )) =
+timesInterval : Interval number units2 -> Interval number units1 -> Interval number (Product units1 units2)
+timesInterval (Interval ( Quantity a2, Quantity b2 )) (Interval ( Quantity a1, Quantity b1 )) =
     let
+        aa =
+            a1 * a2
+
+        ab =
+            a1 * b2
+
+        ba =
+            b1 * a2
+
+        bb =
+            b1 * b2
+    in
+    Interval
+        ( Quantity (min (min (min aa ab) ba) bb)
+        , Quantity (max (max (max aa ab) ba) bb)
+        )
+
+
+{-| Combination of [`timesInterval`](#timesInterval) and [`timesUnitless`](#timesUnitless)
+for when one of the intervals in a product is unitless.
+-}
+timesUnitlessInterval : Interval number Unitless -> Interval number units -> Interval number units
+timesUnitlessInterval unitlessInterval interval =
+    let
+        (Interval ( Quantity a2, Quantity b2 )) =
+            unitlessInterval
+
+        (Interval ( Quantity a1, Quantity b1 )) =
+            interval
+
         aa =
             a1 * a2
 
