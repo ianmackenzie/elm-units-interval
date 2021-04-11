@@ -1021,7 +1021,7 @@ product quantity interval =
 
 {-| Multiply an `Interval` by a unitless `Quantity`. See the documentation for
 [`Quantity.timesUnitless`](https://package.elm-lang.org/packages/ianmackenzie/elm-units/latest/Quantity#timesUnitless)
-more details.
+for more details.
 -}
 timesUnitless : Quantity number Unitless -> Interval number units -> Interval number units
 timesUnitless quantity interval =
