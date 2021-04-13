@@ -10,7 +10,7 @@ module Quantity.Interval exposing
     , negate, multiplyBy, divideBy, half, twice
     , plus, plusInterval, minus, difference, minusInterval
     , times, product, timesUnitless, timesInterval, timesUnitlessInterval
-    , abs, squared, cubed
+    , abs, squared, squaredUnitless, cubed, cubedUnitless
     , randomValue
     )
 
@@ -73,7 +73,7 @@ These functions let you do math with `Interval` values, following the rules of
 @docs negate, multiplyBy, divideBy, half, twice
 @docs plus, plusInterval, minus, difference, minusInterval
 @docs times, product, timesUnitless, timesInterval, timesUnitlessInterval
-@docs abs, squared, cubed
+@docs abs, squared, squaredUnitless, cubed, cubedUnitless
 
 
 # Random value generation
@@ -1132,10 +1132,8 @@ abs interval =
         Interval ( Quantity.zero, Quantity (max -a b) )
 
 
-{-| Get the square of an interval.
--}
-squared : Interval number units -> Interval number (Squared units)
-squared interval =
+unsafeSquared : Interval number units -> Interval number resultUnits
+unsafeSquared interval =
     let
         (Interval ( Quantity a, Quantity b )) =
             interval
@@ -1153,15 +1151,41 @@ squared interval =
         Interval ( Quantity.zero, Quantity (a * a) )
 
 
-{-| Get the cube of an interval.
+{-| Get the square of an interval.
 -}
-cubed : Interval number units -> Interval number (Cubed units)
-cubed interval =
+squared : Interval number units -> Interval number (Squared units)
+squared interval =
+    unsafeSquared interval
+
+
+{-| Specialized version of `squared` for unitless intervals.
+-}
+squaredUnitless : Interval number Unitless -> Interval number Unitless
+squaredUnitless interval =
+    unsafeSquared interval
+
+
+unsafeCubed : Interval number units -> Interval number resultUnits
+unsafeCubed interval =
     let
         (Interval ( Quantity a, Quantity b )) =
             interval
     in
     Interval ( Quantity (a * a * a), Quantity (b * b * b) )
+
+
+{-| Get the cube of an interval.
+-}
+cubed : Interval number units -> Interval number (Cubed units)
+cubed interval =
+    unsafeCubed interval
+
+
+{-| Specialized version of `cubed` for unitless intervals.
+-}
+cubedUnitless : Interval number Unitless -> Interval number Unitless
+cubedUnitless interval =
+    unsafeCubed interval
 
 
 {-| Create a [random generator](https://package.elm-lang.org/packages/elm/random/latest/Random)
