@@ -1,14 +1,14 @@
 module Temperature.Interval exposing
     ( Interval
-    , from, fromEndpoints, singleton
-    , union, intersection
-    , hull, hullN, hullOf, hullOfN
-    , aggregate, aggregateN, aggregateOf, aggregateOfN
+    , fromEndpoints, singleton
+    , hull2, hull, hullN, hullOf, hullOfN
+    , aggregate2, aggregate, aggregateN, aggregateOf, aggregateOfN
     , endpoints, minValue, maxValue, midpoint, width
-    , contains, isContainedIn, intersects, isSingleton
+    , contains, isContainedIn, intersects, intersection, isSingleton
     , interpolate, interpolationParameter
     , plus, minus
     , plusInterval, minusInterval
+    , from, union
     )
 
 {-| This module behaves much like [`Quantity.Interval`](Quantity-Interval), but
@@ -20,12 +20,7 @@ values.
 
 # Constructors
 
-@docs from, fromEndpoints, singleton
-
-
-## Booleans
-
-@docs union, intersection
+@docs fromEndpoints, singleton
 
 
 ## Hull
@@ -33,7 +28,7 @@ values.
 These functions let you construct an `Interval` containing one or more input
 temperatures.
 
-@docs hull, hullN, hullOf, hullOfN
+@docs hull2, hull, hullN, hullOf, hullOfN
 
 
 ## Aggregation
@@ -41,7 +36,7 @@ temperatures.
 These functions let you 'aggregate' one or more temperature intervals into a
 single larger interval that contains all of them.
 
-@docs aggregate, aggregateN, aggregateOf, aggregateOfN
+@docs aggregate2, aggregate, aggregateN, aggregateOf, aggregateOfN
 
 
 # Properties
@@ -51,7 +46,7 @@ single larger interval that contains all of them.
 
 # Queries
 
-@docs contains, isContainedIn, intersects, isSingleton
+@docs contains, isContainedIn, intersects, intersection, isSingleton
 
 
 # Interpolation
@@ -68,6 +63,11 @@ CelsiusDegrees` values, where `Interval` in this case refers to the type in the
 `Quantity.Interval` module. This represents an interval of [temperature deltas](Temperatur#Delta).
 
 @docs plusInterval, minusInterval
+
+
+# Deprecated
+
+@docs from, union
 
 -}
 
@@ -111,8 +111,8 @@ fromEndpoints givenEndpoints =
 {-| Construct an interval with the two given endpoints (which can be provided in
 either order).
 -}
-from : Temperature -> Temperature -> Interval
-from firstValue secondValue =
+hull2 : Temperature -> Temperature -> Interval
+hull2 firstValue secondValue =
     if firstValue |> Temperature.lessThanOrEqualTo secondValue then
         Interval ( firstValue, secondValue )
 
@@ -137,7 +137,7 @@ hullHelp low high remaining =
                 rest
 
         [] ->
-            from low high
+            hull2 low high
 
 
 {-| Construct an interval containing all temperatures in the given list. If the
@@ -195,7 +195,7 @@ hullOfHelp low high getTemperature remaining =
                 rest
 
         [] ->
-            from low high
+            hull2 low high
 
 
 {-| Combination of [`hullOf`](#hullOf) and [`hullN`](#hullN).
@@ -212,8 +212,8 @@ hullOfN getTemperature items =
 
 {-| Construct an interval containing both of the given intervals.
 -}
-union : Interval -> Interval -> Interval
-union firstInterval secondInterval =
+aggregate2 : Interval -> Interval -> Interval
+aggregate2 firstInterval secondInterval =
     let
         ( min1, max1 ) =
             endpoints firstInterval
@@ -254,7 +254,7 @@ intersection firstInterval secondInterval =
 -}
 aggregate : Interval -> List Interval -> Interval
 aggregate first rest =
-    List.foldl union first rest
+    List.foldl aggregate2 first rest
 
 
 {-| Construct an interval containing all of the intervals in the given list. If
@@ -277,7 +277,7 @@ aggregateOf : (a -> Interval) -> a -> List a -> Interval
 aggregateOf getInterval first rest =
     List.foldl
         (\item accumulated ->
-            union accumulated (getInterval item)
+            aggregate2 accumulated (getInterval item)
         )
         (getInterval first)
         rest
@@ -437,16 +437,18 @@ isSingleton interval =
 resulting in a new temperature interval.
 
     temperatureInterval =
-        Temperature.Interval.from
-            (Temperature.degreesCelsius 20)
-            (Temperature.degreesCelsius 25)
+        Temperature.Interval.fromEndpoints
+            ( Temperature.degreesCelsius 20
+            , Temperature.degreesCelsius 25
+            )
 
     temperatureInterval
         |> Temperature.Interval.plus
             (Temperature.celsiusDegrees 10)
-    --> Temperature.Interval.from
-    -->     (Temperature.degreesCelsius 30)
-    -->     (Temperature.degreesCelsius 35)
+    --> Temperature.Interval.fromEndpoints
+    -->     ( Temperature.degreesCelsius 30
+    -->     , Temperature.degreesCelsius 35
+    -->     )
 
 -}
 plus : Temperature.Delta -> Interval -> Interval
@@ -461,16 +463,18 @@ plus delta (Interval ( low, high )) =
 of temperature deltas.
 
     temperatureInterval =
-        Temperature.Interval.from
-            (Temperature.degreesCelsius 20)
-            (Temperature.degreesCelsius 25)
+        Temperature.Interval.fromEndpoints
+            ( Temperature.degreesCelsius 20
+            , Temperature.degreesCelsius 25
+            )
 
     temperatureInterval
         |> Temperature.Interval.minus
             (Temperature.degreesCelsius 15)
-    --> Quantity.Interval.from
-    -->     (Temperature.celsiusDegrees 5)
-    -->     (Temperature.celsiusDegrees 10)
+    --> Quantity.Interval.fromEndpoints
+    -->     ( Temperature.celsiusDegrees 5
+    -->     , Temperature.celsiusDegrees 10
+    -->     )
 
 -}
 minus : Temperature -> Interval -> Interval.Interval Float CelsiusDegrees
@@ -479,7 +483,7 @@ minus temperature interval =
         (Interval ( low, high )) =
             interval
     in
-    Interval.from
+    Interval.hull2
         (low |> Temperature.minus temperature)
         (high |> Temperature.minus temperature)
 
@@ -488,25 +492,28 @@ minus temperature interval =
 temperature interval:
 
     temperatureInterval =
-        Temperature.Interval.from
-            (Temperature.degreesCelsius 20)
-            (Temperature.degreesCelsius 25)
+        Temperature.Interval.fromEndpoints
+            ( Temperature.degreesCelsius 20
+            , Temperature.degreesCelsius 25
+            )
 
     deltaInterval =
-        Quantity.Interval.from
-            (Temperature.celsiusDegrees -1)
-            (Temperature.celsiusDegrees 4)
+        Quantity.Interval.fromEndpoints
+            ( Temperature.celsiusDegrees -1
+            , Temperature.celsiusDegrees 4
+            )
 
     temperatureInterval
         |> Temperature.Interval.plus deltaInterval
-    --> Temperature.Interval.from
-    -->     (Temperature.degreesCelsius 19)
-    -->     (Temperature.degreesCelsius 29)
+    --> Temperature.Interval.fromEndpoints
+    -->     ( Temperature.degreesCelsius 19
+    -->     , Temperature.degreesCelsius 29
+    -->     )
 
 -}
 plusInterval : Interval.Interval Float CelsiusDegrees -> Interval -> Interval
 plusInterval delta (Interval ( low, high )) =
-    from
+    hull2
         (low |> Temperature.plus (Interval.minValue delta))
         (high |> Temperature.plus (Interval.maxValue delta))
 
@@ -515,24 +522,41 @@ plusInterval delta (Interval ( low, high )) =
 a temperature delta interval:
 
     firstInterval =
-        Temperature.Interval.from
-            (Temperature.degreesCelsius 5)
-            (Temperature.degreesCelsius 10)
+        Temperature.Interval.fromEndpoints
+            ( Temperature.degreesCelsius 5
+            , Temperature.degreesCelsius 10
+            )
 
     secondInterval =
-        Temperature.Interval.from
-            (Temperature.degreesCelsius 30)
-            (Temperature.degreesCelsius 40)
+        Temperature.Interval.fromEndpoints
+            ( Temperature.degreesCelsius 30
+            , Temperature.degreesCelsius 40
+            )
 
     secondInterval
         |> Temperature.Interval.minus firstInterval
-    --> Quantity.Interval.from
-    -->     (Temperature.celsiusDegrees 20)
-    -->     (Temperature.celsiusDegrees 35)
+    --> Quantity.Interval.fromEndpoints
+    -->     ( Temperature.celsiusDegrees 20
+    -->     , Temperature.celsiusDegrees 35
+    -->     )
 
 -}
 minusInterval : Interval -> Interval -> Interval.Interval Float CelsiusDegrees
 minusInterval (Interval ( a2, b2 )) (Interval ( a1, b1 )) =
-    Interval.from
+    Interval.hull2
         (a1 |> Temperature.minus b2)
         (b1 |> Temperature.minus a2)
+
+
+{-| Deprecated alias of [`hull2`](#hull2).
+-}
+from : Temperature -> Temperature -> Interval
+from =
+    hull2
+
+
+{-| Deprecated alias of [`aggregate2`](#aggregate2).
+-}
+union : Interval -> Interval -> Interval
+union =
+    aggregate2

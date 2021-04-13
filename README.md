@@ -15,11 +15,13 @@ import Pixels exposing (Pixels)
 
 angleRange : Interval Float Radians
 angleRange =
-    Interval.from (Angle.degrees 0) (Angle.degrees 180)
+    Interval.fromEndpoints
+        ( Angle.degrees 0, Angle.degrees 180 )
 
 widthRange : Interval Int Pixels
 widthRange =
-    Interval.from (Pixels.int 100) (Pixels.int 300)
+    Interval.fromEndpoints
+        ( Pixels.int 100, Pixels.int 300 )
 ```
 
 Various functionality is included for constructing intervals (including as the
@@ -32,7 +34,8 @@ import Length
 import Duration
 
 distanceInterval =
-    Interval.from (Length.meters 10) (Length.meters 20)
+    Interval.fromEndpoints
+        ( Length.meters 10, Length.meters 20 )
 
 Interval.endpoints distanceInterval
 --> ( Length.meters 10, Length.meters 20 )
@@ -43,39 +46,47 @@ Interval.hull
     , Length.feet 2
     , Length.feet 4
     ]
---> Interval.from (Length.feet 2) (Length.feet 5)
+--> Interval.fromEndpoints
+-->     ( Length.feet 2, Length.feet 5 )
 
-Interval.union
-    (Interval.from
-        (Duration.minutes 1)
-        (Duration.minutes 2)
+Interval.aggregate2
+    (Interval.fromEndpoints
+        ( Duration.minutes 1
+        , Duration.minutes 2
+        )
     )
-    (Interval.from
-        (Duration.minutes 3)
-        (Duration.minutes 5)
+    (Interval.fromEndpoints
+        ( Duration.minutes 3
+        , Duration.minutes
+        )
     )
---> Interval.from (Duration.minutes 1) (Duration.minutes 5)
+--> Interval.fromEndpoints
+-->     ( Duration.minutes 1, Duration.minutes 5 )
 
 Interval.intersection
-    (Interval.from
-        (Duration.hours 1)
-        (Duration.hours 3)
+    (Interval.fromEndpoints
+        ( Duration.hours 1
+        , Duration.hours 3
+        )
     )
-    (Interval.from
-        (Duration.hours 2)
-        (Duration.hours 5)
+    (Interval.fromEndpoints
+        ( Duration.hours 2
+        , Duration.hours 5
+        )
     )
---> Just
--->     (Interval.from
--->         (Duration.hours 2)
--->         (Duration.hours 3)
--->     )
+--> Just <|
+-->     Interval.fromEndpoints
+-->         ( Duration.hours 2
+-->         , Duration.hours 3
+-->         )
 
-Interval.from (Angle.radians 0) (Angle.radians pi)
+Interval.fromEndpoints
+    ( Angle.radians 0, Angle.radians pi )
     |> Interval.contains (Angle.degrees 90)
 --> True
 
-Interval.from (Angle.radians 0) (Angle.radians pi)
+Interval.fromEndpoints
+    ( Angle.radians 0, Angle.radians pi )
     |> Interval.contains (Angle.degrees 270)
 --> False
 ```
