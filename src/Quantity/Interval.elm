@@ -154,7 +154,7 @@ fromEndpoints givenEndpoints =
 
 
 {-| Construct an interval containing the two given values (which can be provided
-in either order).
+in either order). `hull2 a b` is equivalent to `fromEndpoints ( a, b )`.
 
     -- "The heights of people participating in the study
     -- ranged from 1.2 to 1.9 meters"
@@ -460,7 +460,7 @@ aggregateHelp a b intervals =
             Interval ( Quantity a, Quantity b )
 
 
-{-| Special case of [`aggregate`](#aggregate) for the case of three intervals;
+{-| Construct an interval containing all three of the given intervals;
 
     Interval.aggregate3 first second third
 
@@ -483,7 +483,7 @@ aggregate3 (Interval ( Quantity a1, Quantity b1 )) (Interval ( Quantity a2, Quan
         )
 
 
-{-| Special case of [`aggregate`](#aggregate) for the case of four intervals.
+{-| Construct an interval containing all four of the given intervals.
 -}
 aggregate4 :
     Interval number units
