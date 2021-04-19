@@ -8,7 +8,7 @@ module Quantity.Interval exposing
     , interpolate, interpolationParameter
     , negate, multiplyBy, divideBy, half, twice
     , plus, plusInterval, minus, difference, minusInterval
-    , times, product, timesUnitless, timesInterval, timesUnitlessInterval
+    , times, product, timesUnitless, timesInterval, timesUnitlessInterval, reciprocal
     , abs, squared, squaredUnitless, cubed, cubedUnitless
     , randomValue
     , from, union
@@ -67,7 +67,7 @@ These functions let you do math with `Interval` values, following the rules of
 
 @docs negate, multiplyBy, divideBy, half, twice
 @docs plus, plusInterval, minus, difference, minusInterval
-@docs times, product, timesUnitless, timesInterval, timesUnitlessInterval
+@docs times, product, timesUnitless, timesInterval, timesUnitlessInterval, reciprocal
 @docs abs, squared, squaredUnitless, cubed, cubedUnitless
 
 
@@ -1189,6 +1189,57 @@ timesUnitlessInterval unitlessInterval interval =
         ( Quantity (min (min (min aa ab) ba) bb)
         , Quantity (max (max (max aa ab) ba) bb)
         )
+
+
+{-| Find the inverse of a unitless interval:
+
+    Interval.reciprocal <|
+        Interval.fromEndpoints
+            ( Quantity.float 2
+            , Quantity.float 3
+            )
+    --> Interval.fromEndpoints
+    -->     ( Quantity.float 0.333
+    -->     , Quantity.flaot 0.500
+    -->     )
+
+Avoid using this function whenever possible, since it's very easy to get
+infinite intervals as a result:
+
+    Interval.reciprocal <|
+        Interval.fromEndpoints
+            ( Quantity.float -1
+            , Quantity.float 2
+            )
+    --> Interval.fromEndpoints
+    -->     ( Quantity.negativeInfinity
+    -->     , Quantity.negativeInfinity
+    -->     )
+
+Since zero is contained in the above interval, the range of possible reciprocals
+ranges from negative to positive infinity!
+
+-}
+reciprocal : Interval Float Unitless -> Interval Float Unitless
+reciprocal interval =
+    let
+        (Interval ( Quantity a, Quantity b )) =
+            interval
+    in
+    if a > 0 || b < 0 then
+        Interval ( Quantity (1 / b), Quantity (1 / a) )
+
+    else if a < 0 && b > 0 then
+        Interval ( Quantity.negativeInfinity, Quantity.positiveInfinity )
+
+    else if a < 0 then
+        Interval ( Quantity.negativeInfinity, Quantity (1 / a) )
+
+    else if b > 0 then
+        Interval ( Quantity (1 / b), Quantity.positiveInfinity )
+
+    else
+        Interval ( Quantity (0 / 0), Quantity (0 / 0) )
 
 
 {-| Get the absolute value of an interval.
